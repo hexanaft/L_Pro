@@ -1209,7 +1209,13 @@ SD_Error SD_ReadBlock(uint8_t *readbuff, uint32_t ReadAddr, uint16_t BlockSize)
   SDIO_DataInitStructure.SDIO_TransferMode = SDIO_TransferMode_Block;
   SDIO_DataInitStructure.SDIO_DPSM = SDIO_DPSM_Enable;
   SDIO_DataConfig(&SDIO_DataInitStructure);
-
+  
+#if defined (SD_DMA_MODE)
+	SDIO_ITConfig(SDIO_IT_DCRCFAIL | SDIO_IT_DTIMEOUT | SDIO_IT_DATAEND | SDIO_IT_RXOVERR | SDIO_IT_STBITERR, ENABLE);
+	SDIO_DMACmd(ENABLE);
+	SD_LowLevel_DMA_RxConfig((uint32_t *)readbuff, BlockSize);
+#endif
+  
   /*!< Send CMD17 READ_SINGLE_BLOCK */
   SDIO_CmdInitStructure.SDIO_Argument = (uint32_t)ReadAddr;
   SDIO_CmdInitStructure.SDIO_CmdIndex = SD_CMD_READ_SINGLE_BLOCK;
@@ -1274,11 +1280,6 @@ SD_Error SD_ReadBlock(uint8_t *readbuff, uint32_t ReadAddr, uint16_t BlockSize)
 
   /*!< Clear all the static flags */
   SDIO_ClearFlag(SDIO_STATIC_FLAGS);
-
-#elif defined (SD_DMA_MODE)
-    SDIO_ITConfig(SDIO_IT_DCRCFAIL | SDIO_IT_DTIMEOUT | SDIO_IT_DATAEND | SDIO_IT_RXOVERR | SDIO_IT_STBITERR, ENABLE);
-    SDIO_DMACmd(ENABLE);
-    SD_LowLevel_DMA_RxConfig((uint32_t *)readbuff, BlockSize);
 #endif
 
   return(errorstatus);
@@ -1337,6 +1338,10 @@ SD_Error SD_ReadMultiBlocks(uint8_t *readbuff, uint32_t ReadAddr, uint16_t Block
   SDIO_DataInitStructure.SDIO_DPSM = SDIO_DPSM_Enable;
   SDIO_DataConfig(&SDIO_DataInitStructure);
 
+  SDIO_ITConfig(SDIO_IT_DCRCFAIL | SDIO_IT_DTIMEOUT | SDIO_IT_DATAEND | SDIO_IT_RXOVERR | SDIO_IT_STBITERR, ENABLE);
+  SDIO_DMACmd(ENABLE);
+  SD_LowLevel_DMA_RxConfig((uint32_t *)readbuff, (NumberOfBlocks * BlockSize));
+  
   /*!< Send CMD18 READ_MULT_BLOCK with argument data address */
   SDIO_CmdInitStructure.SDIO_Argument = (uint32_t)ReadAddr;
   SDIO_CmdInitStructure.SDIO_CmdIndex = SD_CMD_READ_MULT_BLOCK;
@@ -1352,9 +1357,6 @@ SD_Error SD_ReadMultiBlocks(uint8_t *readbuff, uint32_t ReadAddr, uint16_t Block
     return(errorstatus);
   }
 
-  SDIO_ITConfig(SDIO_IT_DCRCFAIL | SDIO_IT_DTIMEOUT | SDIO_IT_DATAEND | SDIO_IT_RXOVERR | SDIO_IT_STBITERR, ENABLE);
-  SDIO_DMACmd(ENABLE);
-  SD_LowLevel_DMA_RxConfig((uint32_t *)readbuff, (NumberOfBlocks * BlockSize));
 
   return(errorstatus);
 }
@@ -1397,6 +1399,10 @@ SD_Error SD_ReadMultiBlocksFIXED(uint8_t *readbuff, uint32_t ReadAddr, uint32_t 
   SDIO_DataInitStructure.SDIO_TransferMode = SDIO_TransferMode_Block;
   SDIO_DataInitStructure.SDIO_DPSM = SDIO_DPSM_Enable;
   SDIO_DataConfig(&SDIO_DataInitStructure);
+  
+  SDIO_ITConfig(SDIO_IT_DCRCFAIL | SDIO_IT_DTIMEOUT | SDIO_IT_DATAEND | SDIO_IT_RXOVERR | SDIO_IT_STBITERR, ENABLE);
+  SDIO_DMACmd(ENABLE);
+  SD_LowLevel_DMA_RxConfig((uint32_t *)readbuff, (NumberOfBlocks * BlockSize));
 
   /*!< Send CMD18 READ_MULT_BLOCK with argument data address */
   SDIO_CmdInitStructure.SDIO_Argument = (uint32_t)ReadAddr;
@@ -1412,10 +1418,6 @@ SD_Error SD_ReadMultiBlocksFIXED(uint8_t *readbuff, uint32_t ReadAddr, uint32_t 
   {
     return(errorstatus);
   }
-
-  SDIO_ITConfig(SDIO_IT_DCRCFAIL | SDIO_IT_DTIMEOUT | SDIO_IT_DATAEND | SDIO_IT_RXOVERR | SDIO_IT_STBITERR, ENABLE);
-  SDIO_DMACmd(ENABLE);
-  SD_LowLevel_DMA_RxConfig((uint32_t *)readbuff, (NumberOfBlocks * BlockSize));
 
   return(errorstatus);
 }
@@ -1522,7 +1524,13 @@ SD_Error SD_WriteBlock(uint8_t *writebuff, uint32_t WriteAddr, uint16_t BlockSiz
   {
     return(errorstatus);
   }
-
+  
+#if defined (SD_DMA_MODE)
+  SDIO_ITConfig(SDIO_IT_DCRCFAIL | SDIO_IT_DTIMEOUT | SDIO_IT_DATAEND | SDIO_IT_RXOVERR | SDIO_IT_STBITERR, ENABLE);
+  SD_LowLevel_DMA_TxConfig((uint32_t *)writebuff, BlockSize);
+  SDIO_DMACmd(ENABLE);
+#endif
+  
   /*!< Send CMD24 WRITE_SINGLE_BLOCK */
   SDIO_CmdInitStructure.SDIO_Argument = WriteAddr;
   SDIO_CmdInitStructure.SDIO_CmdIndex = SD_CMD_WRITE_SINGLE_BLOCK;
@@ -1595,10 +1603,6 @@ SD_Error SD_WriteBlock(uint8_t *writebuff, uint32_t WriteAddr, uint16_t BlockSiz
     errorstatus = SD_START_BIT_ERR;
     return(errorstatus);
   }
-#elif defined (SD_DMA_MODE)
-  SDIO_ITConfig(SDIO_IT_DCRCFAIL | SDIO_IT_DTIMEOUT | SDIO_IT_DATAEND | SDIO_IT_RXOVERR | SDIO_IT_STBITERR, ENABLE);
-  SD_LowLevel_DMA_TxConfig((uint32_t *)writebuff, BlockSize);
-  SDIO_DMACmd(ENABLE);
 #endif
 
   return(errorstatus);
@@ -1680,7 +1684,10 @@ SD_Error SD_WriteMultiBlocks(uint8_t *writebuff, uint32_t WriteAddr, uint16_t Bl
     return(errorstatus);
   }
 
-
+  SDIO_ITConfig(SDIO_IT_DCRCFAIL | SDIO_IT_DTIMEOUT | SDIO_IT_DATAEND | SDIO_IT_RXOVERR | SDIO_IT_STBITERR, ENABLE);
+  SDIO_DMACmd(ENABLE);
+  SD_LowLevel_DMA_TxConfig((uint32_t *)writebuff, (NumberOfBlocks * BlockSize));
+  
   /*!< Send CMD25 WRITE_MULT_BLOCK with argument data address */
   SDIO_CmdInitStructure.SDIO_Argument = (uint32_t)WriteAddr;
   SDIO_CmdInitStructure.SDIO_CmdIndex = SD_CMD_WRITE_MULT_BLOCK;
@@ -1703,10 +1710,6 @@ SD_Error SD_WriteMultiBlocks(uint8_t *writebuff, uint32_t WriteAddr, uint16_t Bl
   SDIO_DataInitStructure.SDIO_TransferMode = SDIO_TransferMode_Block;
   SDIO_DataInitStructure.SDIO_DPSM = SDIO_DPSM_Enable;
   SDIO_DataConfig(&SDIO_DataInitStructure);
-
-  SDIO_ITConfig(SDIO_IT_DCRCFAIL | SDIO_IT_DTIMEOUT | SDIO_IT_DATAEND | SDIO_IT_RXOVERR | SDIO_IT_STBITERR, ENABLE);
-  SDIO_DMACmd(ENABLE);
-  SD_LowLevel_DMA_TxConfig((uint32_t *)writebuff, (NumberOfBlocks * BlockSize));
 
   return(errorstatus);
 }
@@ -1773,6 +1776,9 @@ SD_Error SD_WriteMultiBlocksFIXED(uint8_t *writebuff, uint32_t WriteAddr, uint32
     return(errorstatus);
   }
 
+  SDIO_ITConfig(SDIO_IT_DCRCFAIL | SDIO_IT_DTIMEOUT | SDIO_IT_DATAEND | SDIO_IT_RXOVERR | SDIO_IT_STBITERR, ENABLE);
+  SDIO_DMACmd(ENABLE);
+  SD_LowLevel_DMA_TxConfig((uint32_t *)writebuff, (NumberOfBlocks * BlockSize));
 
   /*!< Send CMD25 WRITE_MULT_BLOCK with argument data address */
   SDIO_CmdInitStructure.SDIO_Argument = (uint32_t)WriteAddr;
@@ -1796,10 +1802,6 @@ SD_Error SD_WriteMultiBlocksFIXED(uint8_t *writebuff, uint32_t WriteAddr, uint32
   SDIO_DataInitStructure.SDIO_TransferMode = SDIO_TransferMode_Block;
   SDIO_DataInitStructure.SDIO_DPSM = SDIO_DPSM_Enable;
   SDIO_DataConfig(&SDIO_DataInitStructure);
-
-  SDIO_ITConfig(SDIO_IT_DCRCFAIL | SDIO_IT_DTIMEOUT | SDIO_IT_DATAEND | SDIO_IT_RXOVERR | SDIO_IT_STBITERR, ENABLE);
-  SDIO_DMACmd(ENABLE);
-  SD_LowLevel_DMA_TxConfig((uint32_t *)writebuff, (NumberOfBlocks * BlockSize));
 
   return(errorstatus);
 }

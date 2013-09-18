@@ -14,6 +14,13 @@
 #include "stm32f4xx.h"
 #include "stm32f4_discovery_sdio_sd.h"
 
+//******************************************************************************
+#include "FreeRTOS.h"
+#include "queue.h"
+#include "task.h"
+#include "croutine.h"
+//******************************************************************************
+
 
 extern SD_CardInfo SDCardInfo;
 BYTE SDInitialized = 0;
@@ -40,6 +47,8 @@ DSTATUS disk_initialize (
 	
 	if( pdrv == SD_DISK_PDRV )
 	{
+		//taskENTER_CRITICAL();
+		
 		if (SDInitialized == 1)
 		{
 			DEBUG_PRINT(("Allredy configure SD card.\n"));
@@ -72,10 +81,14 @@ DSTATUS disk_initialize (
 		}
 		#endif
 		
-		SDInitialized = 1;
-		DEBUG_PRINT(("Configure SD card - OK.\n"));
-		
-		return 0;	/* All OK */
+		if(SDError == SD_OK)
+		{
+			SDInitialized = 1;
+			DEBUG_PRINT(("Configure SD card - OK.\n"));
+			//taskEXIT_CRITICAL();
+
+			return 0;	/* All OK */
+		}
 	}
 	return STA_NOINIT;
 }
@@ -134,7 +147,8 @@ DRESULT disk_read (
 	DRESULT dresult = RES_OK;
 	SD_Error SDError;
 	if( pdrv == SD_DISK_PDRV )
-	{	
+	{
+		//taskENTER_CRITICAL();
 		DEBUG_PRINT(("disk_read  pdrv=%d *buff=%p sector=%d count=%d\n",pdrv,buff,sector,count));
 		if(count <= 1)
 		{
@@ -175,6 +189,7 @@ DRESULT disk_read (
 			while( SD_GetStatus() != SD_TRANSFER_OK );
 			if(SDError != SD_OK)dresult = RES_ERROR;
 		}
+		//taskEXIT_CRITICAL();
 		return dresult;
 	}
 	return RES_PARERR;
@@ -198,6 +213,7 @@ DRESULT disk_write (
 	SD_Error SDError;
 	if( pdrv == SD_DISK_PDRV )
 	{	
+		//taskENTER_CRITICAL();
 		DEBUG_PRINT(("disk_write  pdrv=%d *buff=%p sector=%d count=%d\n",pdrv,buff,sector,count));
 		if(count <= 1)
 		{
@@ -238,6 +254,8 @@ DRESULT disk_write (
 			while( SD_GetStatus() != SD_TRANSFER_OK );
 			if(SDError != SD_OK)dresult = RES_ERROR;
 		}
+		
+		//taskEXIT_CRITICAL();
 		return dresult;
 	}
 	return RES_PARERR;
@@ -256,9 +274,39 @@ DRESULT disk_ioctl (
 	void *buff		/* Buffer to send/receive control data */
 )
 {
+	DRESULT dresult = RES_OK;
 	if( pdrv == SD_DISK_PDRV )
 	{
-		
+		switch(cmd)
+		{
+		case CTRL_SYNC:
+			while(SDIO_GetResponse(SDIO_RESP1)==0);
+			dresult = RES_OK;
+			break;
+		case GET_SECTOR_COUNT:
+			if(	(SDCardInfo.CardType == SDIO_STD_CAPACITY_SD_CARD_V1_1) || 
+				(SDCardInfo.CardType == SDIO_STD_CAPACITY_SD_CARD_V2_0))
+				*(DWORD*)buff = SDCardInfo.CardCapacity >> 9;
+			else if(SDCardInfo.CardType == SDIO_HIGH_CAPACITY_SD_CARD)
+				*(DWORD*)buff = (SDCardInfo.SD_csd.DeviceSize+1)*1024;
+			dresult = RES_OK;
+			break;
+		case GET_SECTOR_SIZE:
+			*(WORD*)buff = 512;
+			dresult = RES_OK;
+			break;
+		case GET_BLOCK_SIZE:
+			*(WORD*)buff = SDCardInfo.CardBlockSize;
+			dresult = RES_OK;
+			break;
+		case CTRL_ERASE_SECTOR:
+			//TODO:
+			break;
+		default:
+			dresult = RES_PARERR;
+			break;
+		}
+		return dresult;
 	}
 	return RES_PARERR;
 }
