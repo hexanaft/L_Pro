@@ -77,6 +77,77 @@ typedef struct
 //	Frame_t 		*frame;
 }File_ilda_t;
 
+uint32_t toint( uint8_t * buf )
+{
+	uint8_t i;
+	uint32_t tmp1=0;
+	
+	for(i=0;i<sizeof(tmp1);i++)tmp1 |= (uint32_t)(buf[i])<<(8*i);
+	return tmp1;
+}
+uint16_t toshort( uint8_t * buf )
+{
+	uint8_t i;
+	uint16_t tmp1=0;
+	
+	for(i=0;i<sizeof(tmp1);i++)tmp1 |= (uint16_t)(buf[i])<<(8*i);
+	return tmp1;
+}
+
+/*	Вывод прямо с флешки.
+	//=========================================================================
+	printf("f_open:\n");
+	fresult = f_open(&file, filepath, FA_OPEN_EXISTING | FA_READ);
+	FR_print_error(fresult);
+	
+	n=1400;
+	while(n--)
+	{
+		f_lseek(&file,0);
+		
+		//printf("f_read:\n");
+		f_read(&file,(uint8_t*)Zagolovok,sizeof(Zagolovok),0);
+		for(i=0;i<(sizeof(Zagolovok)/sizeof(uint32_t));++i)
+		{
+			//printf("0x%06X =%u;  ",Zagolovok[i],Zagolovok[i]);
+		}
+		//printf("\n");
+		KolvoFreimov = Zagolovok[0];
+		
+		for(k=0;k<(KolvoFreimov);k++)
+		{
+			f_read(&file,(void *)&KolvoFigurVFreime,sizeof(KolvoFigurVFreime),0);
+			//printf("KolvoFigurVFreime = 0x%04X =%u;\n",KolvoFigurVFreime,KolvoFigurVFreime);
+			
+			
+			for(j=0;j<KolvoFigurVFreime;j++)
+			{
+				f_read(&file,(void *)&KolvoTochekVFigure,sizeof(KolvoTochekVFigure),0);
+				//printf("KolvoTochekVFigure = 0x%04X =%u;\n",KolvoTochekVFigure,KolvoTochekVFigure);
+					
+				f_read(&file,(void *)&KolvoByteVFigure,sizeof(KolvoByteVFigure),0);
+				//printf("KolvoByteVFigure = 0x%04X =%u;\n",KolvoByteVFigure,KolvoByteVFigure);
+				
+				for(i=0;i<KolvoTochekVFigure;i++)
+				{
+					f_read(&file,(void *)&valueX,2,0);
+					f_read(&file,(void *)&valueY,2,0);
+					//printf("valueX = 0x%04X =%6u;\tvalueY = 0x%04X =%6u;\n",valueX,valueX,valueY,valueY);
+					setXY(valueX,valueY);
+					delayXY(15000);
+				}
+			}
+		}
+	}
+ 	printf("f_close:\n");
+ 	fresult = f_close(&file);
+ 	FR_print_error(fresult);
+	//=========================================================================
+
+*/
+
+
+
 uint32_t ReadToMemZag( FIL *fp, File_ilda_t* File_ilda )
 {
 	printf("ReadToMem:%u\n",sizeof(File_ilda_t));
