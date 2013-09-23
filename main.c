@@ -277,6 +277,9 @@ int main(void)
 	STM_EVAL_LEDInit(LED_RED);
 	//=========================================================================
 	
+	#ifdef SD_DMA_MODE
+	SD_NVIC_Configuration();
+	#endif
 
 /*	
 //	printf("f_mount:\n");
@@ -558,12 +561,11 @@ void vReadSDtmp(void *pvParameters)
 void vSendUart(void *pvParameters)
 {
 	UART_Configuration();
-	#ifdef SD_DMA_MODE
-	SD_NVIC_Configuration();
-	#endif
+	printf("UART_Configuration: DONE\n");
 	
 	for(;;)
 	{
+		
 		STM_EVAL_LEDToggle(LED_BLUE);
 		vTaskDelay( 500 / portTICK_RATE_MS );
 	}
