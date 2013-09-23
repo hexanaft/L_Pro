@@ -6,7 +6,8 @@
 #include "stm32f4xx.h"
 #include <stdio.h>
 
-#define TTL GPIO_Pin_15
+#define TTL 		GPIO_Pin_15
+#define TTL_GPIO	GPIOA
 
 #define DAC_SCLK	GPIO_Pin_1
 #define DAC_SYNC	GPIO_Pin_2

@@ -49,6 +49,7 @@ void vLedBlinkRed(void *pvParameters);
 void vLedBlinkGreen(void *pvParameters);
 void vLedBlinkOrange(void *pvParameters);
 void vSendUart(void *pvParameters);
+void vOutToLaser(void *pvParameters);
 
 
 typedef struct
@@ -277,6 +278,20 @@ int main(void)
 	STM_EVAL_LEDInit(LED_RED);
 	//=========================================================================
 	
+// 	//=========================================================================
+// 	RNG_Config();
+// 	initialization_set_xy();
+// 	GPIO_SetBits(GPIOA, TTL);
+// 	
+// 	for(;;)
+// 	{
+// 		uint32_t value = getRandom(); // 10 bits = 0...1024 mSec
+// 		setXY(((uint16_t) value), ((uint16_t) (value>>16)));
+// 		//vTaskDelay( 1 / portTICK_RATE_MS );
+// 		delayXY(50000);
+// 	}
+// 	//=========================================================================
+	
 	#ifdef SD_DMA_MODE
 	SD_NVIC_Configuration();
 	#endif
@@ -445,7 +460,9 @@ int main(void)
 		STACK_SIZE_MIN, NULL, tskIDLE_PRIORITY, NULL );	
 	xTaskCreate( vReadSD, (const signed char*)"vReadSD", 
 		STACK_SIZE_MIN*10, NULL, tskIDLE_PRIORITY, NULL );
-	
+	xTaskCreate( vOutToLaser, (const signed char*)"vOutToLaser", 
+		STACK_SIZE_MIN*10, NULL, tskIDLE_PRIORITY, NULL );
+		
 	vTaskStartScheduler();
 	//-------------------------------------------------------------------------
 }
@@ -604,14 +621,23 @@ void vLedBlinkOrange(void *pvParameters)
 
 void vOutToLaser(void *pvParameters)
 {
-	
-	//initialization_set_xy();
-	//GPIO_SetBits(GPIOA, TTL);
-	
+	uint32_t value=0;
+	uint16_t valueX=0;
+	uint16_t valueY=0;
+	RNG_Config();
+	initialization_set_xy();
+	GPIO_SetBits(TTL_GPIO, TTL);
+
 	for(;;)
 	{
+		value = getRandom(); // 10 bits = 0...1024 mSec
+		valueX = (uint16_t) value;
+		valueY = (uint16_t) (value>>16);
 		
-		vTaskDelay( 900 / portTICK_RATE_MS );
+		//printf("%u-%u\n",valueX,valueY );
+		
+		setXY(valueX, valueY);
+		vTaskDelay( 100 / portTICK_RATE_MS );
 	}
 }
 //******************************************************************************
