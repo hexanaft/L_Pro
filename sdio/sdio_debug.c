@@ -274,7 +274,7 @@ SD_Error SD_PrintCardStatus( void )
 
 void SD_test( void )
 {	
-	static uint32_t sdioclk = ((HSE_VALUE/8)*336)/6;
+	static uint32_t sdioclk = ((HSE_VALUE/8)*336)/15;
 	SD_Error		SDError;
 	
 	printf("Configure SD card...\n");

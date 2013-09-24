@@ -7,7 +7,9 @@ void initialization_set_xy( void )
 		
 	port.GPIO_Mode = GPIO_Mode_OUT;
 	port.GPIO_Pin = DAC_SCLK | DAC_SYNC | DAC_DIN | DAC_DIN2 | TTL;
-	port.GPIO_Speed = GPIO_Speed_50MHz;
+	port.GPIO_Speed = GPIO_Speed_100MHz;//GPIO_Speed_50MHz;
+	port.GPIO_OType = GPIO_OType_PP;
+	port.GPIO_PuPd = GPIO_PuPd_NOPULL;
 	GPIO_Init(DAC_GPIO, &port);
 }
 
@@ -34,12 +36,12 @@ void delayXY(uint32_t counter2)
 
 void setXY(uint16_t valueX, uint16_t valueY)
 {
-	uint16_t mask = 0x8000, buf_func_X = 0, buf_func_Y = 0;
+	uint16_t mask = 0x8000;
 	int count = 0;	
 
-	buf_func_X = valueX;
-	buf_func_Y = valueY;
-	GPIO_ResetBits(DAC_GPIO, DAC_SYNC | DAC_DIN | DAC_DIN2);
+	GPIO_ResetBits(DAC_GPIO, DAC_DIN);
+	GPIO_ResetBits(DAC_GPIO, DAC_DIN2);
+	GPIO_ResetBits(DAC_GPIO, DAC_SYNC);
 	//delay(0xffff);
 	/*
 	while (count <= 7)
@@ -53,18 +55,20 @@ void setXY(uint16_t valueX, uint16_t valueY)
 	*/
 	while (count <= 15)
 	{
-		if ((buf_func_X & mask) == 0)	GPIO_ResetBits(DAC_GPIO, DAC_DIN);
+		if ((valueX & mask) == 0)	GPIO_ResetBits(DAC_GPIO, DAC_DIN);
 		else GPIO_SetBits(DAC_GPIO, DAC_DIN);
 		//delay(0xffff);
-		if ((buf_func_Y & mask) == 0)	GPIO_ResetBits(DAC_GPIO, DAC_DIN2);
+		if ((valueY & mask) == 0)	GPIO_ResetBits(DAC_GPIO, DAC_DIN2);
 		else GPIO_SetBits(DAC_GPIO, DAC_DIN2);
 		//delay(0xffff);
 		mask = mask >> 1;
-		GPIO_SetBits(DAC_GPIO, DAC_SCLK);
 		count++;
-		//delay(0xffff);
+		
+		GPIO_SetBits(DAC_GPIO, DAC_SCLK);
+		delayXY(0x7f);
+	
 		GPIO_ResetBits(DAC_GPIO, DAC_SCLK);
-		//delay(0xffff);
+		delayXY(0x7f);
 	}
 	GPIO_SetBits(DAC_GPIO, DAC_SYNC);
 	//delay(0xffff);

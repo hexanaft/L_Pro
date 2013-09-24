@@ -13,7 +13,7 @@
 // void _ttywrch(int ch);
 // void _sys_exit(int return_code);
 
-#define	DBG_USART6
+#define	DBG_USART3
 
 #ifdef	DBG_USART2
 //===============================================================

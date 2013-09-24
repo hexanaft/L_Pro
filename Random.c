@@ -7,6 +7,7 @@
   * @retval None
   *    Get a 32bit Random number     
   *    random32bit = RNG_GetRandomNumber();
+  *    40 periods of the PLL48CLK clock signal between two consecutive random numbers
   */
 
 void RNG_Config( void )

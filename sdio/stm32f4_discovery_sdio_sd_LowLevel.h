@@ -12,7 +12,7 @@
 /**
   * @brief  SD FLASH SDIO Interface
   */
-#define SD_DETECT_PIN                    GPIO_Pin_2                 /* PC.02 */
+#define SD_DETECT_PIN                    GPIO_Pin_7                 /* PC.07 */
 #define SD_DETECT_GPIO_PORT              GPIOC                      /* GPIOC */
 #define SD_DETECT_GPIO_CLK               RCC_AHB1Periph_GPIOC
 

@@ -76,25 +76,25 @@ typedef struct
 	uint32_t	DelayBetweenPoints;
 	uint32_t	DelayLazerOnOff;
 //	Frame_t 		*frame;
-}File_ilda_t;
-
-uint32_t toint( uint8_t * buf )
-{
-	uint8_t i;
-	uint32_t tmp1=0;
-	
-	for(i=0;i<sizeof(tmp1);i++)tmp1 |= (uint32_t)(buf[i])<<(8*i);
-	return tmp1;
-}
-uint16_t toshort( uint8_t * buf )
-{
-	uint8_t i;
-	uint16_t tmp1=0;
-	
-	for(i=0;i<sizeof(tmp1);i++)tmp1 |= (uint16_t)(buf[i])<<(8*i);
-	return tmp1;
-}
-
+}Head_ilda_t;
+/*
+// uint32_t toint( uint8_t * buf )
+// {
+// 	uint8_t i;
+// 	uint32_t tmp1=0;
+// 	
+// 	for(i=0;i<sizeof(tmp1);i++)tmp1 |= (uint32_t)(buf[i])<<(8*i);
+// 	return tmp1;
+// }
+// uint16_t toshort( uint8_t * buf )
+// {
+// 	uint8_t i;
+// 	uint16_t tmp1=0;
+// 	
+// 	for(i=0;i<sizeof(tmp1);i++)tmp1 |= (uint16_t)(buf[i])<<(8*i);
+// 	return tmp1;
+// }
+*/
 /*	Вывод прямо с флешки.
 	//=========================================================================
 	printf("f_open:\n");
@@ -149,31 +149,17 @@ uint16_t toshort( uint8_t * buf )
 
 
 
-uint32_t ReadToMemZag( FIL *fp, File_ilda_t* File_ilda )
-{
-	printf("ReadToMem:%u\n",sizeof(File_ilda_t));
-	printf("f_read:\n");
-	f_read(fp,(void*)File_ilda,sizeof(File_ilda_t),0);
-	
-	return sizeof(File_ilda_t);
-}
 
-void PrintILDA( File_ilda_t * File_ilda )
-{
-	printf("File.NumOfFrames:        %u\n",File_ilda->NumOfFrames);
-	printf("File.NumOfRepeatFrames:  %u\n",File_ilda->NumOfRepeatFrames);
-	printf("File.DelayBetweenFrames: %u\n",File_ilda->DelayBetweenFrames);
-	printf("File.DelayBetweenPoints: %u\n",File_ilda->DelayBetweenPoints);
-	printf("File.DelayLazerOnOff:    %u\n",File_ilda->DelayLazerOnOff);
-}
 
+/*
 uint32_t ReadToMem( FIL *fp, uint32_t FramePointer, Frame_t* frame )
 {
-	Figure_t	figure;
-	uint32_t	*points;
-	uint16_t 	i,j;
-	uint16_t 	sizeOfPoints=0;
+// 	Figure_t	figure;
+// 	uint32_t	*points;
+// 	uint16_t 	j;
+// 	uint16_t 	sizeOfPoints=0;
 	
+	uint16_t 	i;
 	uint16_t	NumOfFigures=0;
 	uint16_t	SizeOfFrame=0;
 	uint16_t	NumOfPoints=0;
@@ -196,7 +182,7 @@ uint32_t ReadToMem( FIL *fp, uint32_t FramePointer, Frame_t* frame )
 	}
 	printf("ReadToMem:%u\n",SizeOfFrame);
 	
-// 	printf("ReadToMem:%u\n",sizeof(File_ilda_t));
+// 	printf("ReadToMem:%u\n",sizeof(Head_ilda_t));
 // 	printf("f_read:\n");
 // 	f_lseek(fp,(int)FramePointer);
 // 	f_read(fp,(void*)frame->NumOfFigures,sizeof(uint16_t),0);
@@ -221,8 +207,69 @@ uint32_t ReadToMem( FIL *fp, uint32_t FramePointer, Frame_t* frame )
 // 		for(i=0; i<figure.NumOfPoints;i++)
 // 			printf("x: %6u y: %6u\n",(uint16_t)(points[i]>>16),(uint16_t)(points[i]));
 // 	}
-	return sizeof(File_ilda_t);
+	return sizeof(Head_ilda_t);
 }
+*/
+
+//******************************************************************************
+void init_timer6()
+{
+	TIM_TimeBaseInitTypeDef base_timer;
+	
+	/* Не забываем затактировать таймер, частота таймера = APB2 * 2 */
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM6, ENABLE);
+
+	/* Инициализируем базовый таймер: делитель 42000, период 500 мс.
+	* Другие параметры структуры TIM_TimeBaseInitTypeDef
+	* не имеют смысла для базовых таймеров.
+	*/
+	TIM_TimeBaseStructInit(&base_timer);
+	/* Делитель учитывается как TIM_Prescaler + 1, поэтому отнимаем 1 */
+	base_timer.TIM_Prescaler = 8400 - 1;
+	base_timer.TIM_Period = 1000;	// 1 секунда при 8400 делителе и 10000 таймере.
+	TIM_TimeBaseInit(TIM6, &base_timer);
+
+	/* Разрешаем прерывание по обновлению (в данном случае -
+	* по переполнению) счётчика таймера TIM6.
+	*/
+	TIM_ITConfig(TIM6, TIM_IT_Update, ENABLE);
+	/* Включаем таймер */
+	TIM_Cmd(TIM6, ENABLE);
+
+	/* Разрешаем обработку прерывания по переполнению счётчика
+	* таймера TIM6. Так получилось, что это же прерывание
+	* отвечает и за опустошение ЦАП.
+	*/
+	NVIC_EnableIRQ(TIM6_DAC_IRQn);
+}
+
+void TIM6_DAC_IRQHandler()
+{
+	uint32_t value=0;
+	uint16_t valueX=0;
+	uint16_t valueY=0;
+	
+	/* Так как этот обработчик вызывается и для ЦАП, нужно проверять,
+	* произошло ли прерывание по переполнению счётчика таймера TIM6.
+	*/
+	if (TIM_GetITStatus(TIM6, TIM_IT_Update) != RESET)
+	{
+		/* Очищаем бит обрабатываемого прерывания */
+		TIM_ClearITPendingBit(TIM6, TIM_IT_Update);
+		
+		/* Инвертируем состояние светодиодов */
+		STM_EVAL_LEDToggle(LED_ORANGE);
+		
+		value = getRandom(); // 10 bits = 0...1024 mSec
+		valueX = (uint16_t) value;
+		valueY = (uint16_t) (value>>16);
+		setXY(valueX, valueY);
+		//printf("%u-%u\n",valueX,valueY );
+	}
+}
+//******************************************************************************
+
+
 //******************************************************************************
 int main(void)
 {
@@ -234,33 +281,33 @@ int main(void)
 	 */
 
 	//=========================================================================
-//	uint32_t 	i = 0;
-//	uint32_t 	n = 0;
+// 	uint32_t 	i = 0;
+// //	uint32_t 	n = 0;
 // 	uint32_t 	fsize = 0;
-//	uint32_t 	random32bit;
+// //	uint32_t 	random32bit;
+// //	uint8_t 	Buff[24]= {0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0};
+// 		
+// //	uint32_t	Zagolovok[5] = {0,0,0,0,0};
+// //	uint32_t	KolvoFreimov = 0;
+// //	uint16_t	KolvoFigurVFreime = 0;
+// //	uint16_t	KolvoTochekVFigure = 0;
+// //	uint16_t	KolvoByteVFigure = 0;
+// //	uint16_t	valueX = 0;
+// //	uint16_t	valueY = 0;
+// 	
 // 	FATFS   	fs;
-//	uint8_t 	Buff[24]= {0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0};
-		
-//	uint32_t	Zagolovok[5] = {0,0,0,0,0};
-//	uint32_t	KolvoFreimov = 0;
-//	uint16_t	KolvoFigurVFreime = 0;
-//	uint16_t	KolvoTochekVFigure = 0;
-//	uint16_t	KolvoByteVFigure = 0;
-//	uint16_t	valueX = 0;
-//	uint16_t	valueY = 0;
-	
-//	FIL     	file;
-//	FRESULT		fresult;
+// 	FIL     	file;
+// 	FRESULT		fresult;
 // 	FILINFO		filinfo;
 // 	DIR			dir;
-//	TCHAR		buffstr[100];
-//	TCHAR		filename[16];
-//	TCHAR		filepath[] = {"0:sun.bin"};
-//	FILINFO *filinfo;
-//	uint8_t *file_in_memory = NULL;
-//	File_ilda nfile;
-	
-//	uint32_t *pint;
+// 	TCHAR		buffstr[100];
+// 	TCHAR		filename[16];
+// 	TCHAR		filepath[] = {"0:sun.bin"};
+// //	FILINFO *filinfo;
+// 	uint8_t *file_in_memory = NULL;
+// //	Head_ilda nfile;
+// 	
+// //	uint32_t *pint;
 	//=========================================================================
 
 	/*!< Most systems default to the wanted configuration, with the noticeable 
@@ -296,10 +343,10 @@ int main(void)
 	SD_NVIC_Configuration();
 	#endif
 
-/*	
-//	printf("f_mount:\n");
-//	fresult = f_mount(0, &fs);
-//	FR_print_error(fresult);
+/*
+// 	printf("f_mount:\n");
+// 	fresult = f_mount(0, &fs);
+// 	FR_print_error(fresult);
 
 // 	//=========================================================================
 //  	printf("f_stat:\n");
@@ -317,20 +364,21 @@ int main(void)
 // 	}
 // 	else printf("malloc OK!\n");
 // 	//=========================================================================
+// 	
+// 	
+	
+	
+//	SD_test(  );
 	
 	
 	
-	
-	
-	
-	
-// 	//=========================================================================
+	//=========================================================================
 // 	printf("f_open:\n");
 // 	fresult = f_open(&file, filepath, FA_OPEN_EXISTING | FA_READ);
 // 	FR_print_error(fresult);
-// 	
+	
 // 	printf("f_read:\n");
-//  	f_read(&file,(uint8_t*)file_in_memory,fsize,0);
+//  	f_read(&file,(uint8_t*)file_in_memory,602,0);//fsize,0);
 // 	for(i=0;i<fsize;++i)printf("0x%02X ",file_in_memory[i]);
 // 	printf("\n");
 // 	file_in_memory[0] = 0xaa;
@@ -354,44 +402,44 @@ int main(void)
 // 	}
 // 	printf("\nNumOfFrames = 0x%08X =%u;\n",KolvoFreimov,KolvoFreimov);
 // 	
-// 	
-// //	for(i=0;i<(sizeof(Zagolovok)/sizeof(uint32_t));++i)
-// //	{
-// //		Zagolovok[i] = file_in_memory[n+sizeof(uint32_t)];
-// //		printf("0x%06X =%u;  ",Zagolovok[i],Zagolovok[i]);
-// //	}
-// // 	printf("\n");
-// //	KolvoFreimov = Zagolovok[0];
-// //	
-// //	for(k=0;k<(KolvoFreimov);k++)
-// //	{
-// //		KolvoFigurVFreime = file_in_memory[n+sizeof(uint16_t)];
-// //		printf("KolvoFigurVFreime = 0x%04X =%u;\n",KolvoFigurVFreime,KolvoFigurVFreime);
-// //		
-// //		for(j=0;j<KolvoFigurVFreime;j++)
-// //		{
-// //			KolvoTochekVFigure  = file_in_memory[n+sizeof(uint16_t)];
-// //			printf("KolvoTochekVFigure = 0x%04X =%u;\n",KolvoTochekVFigure,KolvoTochekVFigure);
-// //				
-// //			KolvoByteVFigure = file_in_memory[n+sizeof(uint32_t)];
-// //			printf("KolvoByteVFigure = 0x%04X =%u;\n",KolvoByteVFigure,KolvoByteVFigure);
-// //			
-// //			for(i=0;i<KolvoTochekVFigure;i++)
-// //			{
-// //				valueX = file_in_memory[n+sizeof(uint16_t)];
-// //				valueY = file_in_memory[n+sizeof(uint16_t)];
-// //				printf("valueX = 0x%04X =%6u;\tvalueY = 0x%04X =%6u;\n",valueX,valueX,valueY,valueY);
-// //			}
-// //		}
-// //	}
-// 	
-// 	
-// 	
-// 	
+	
+//	for(i=0;i<(sizeof(Zagolovok)/sizeof(uint32_t));++i)
+//	{
+//		Zagolovok[i] = file_in_memory[n+sizeof(uint32_t)];
+//		printf("0x%06X =%u;  ",Zagolovok[i],Zagolovok[i]);
+//	}
+// 	printf("\n");
+//	KolvoFreimov = Zagolovok[0];
+//	
+//	for(k=0;k<(KolvoFreimov);k++)
+//	{
+//		KolvoFigurVFreime = file_in_memory[n+sizeof(uint16_t)];
+//		printf("KolvoFigurVFreime = 0x%04X =%u;\n",KolvoFigurVFreime,KolvoFigurVFreime);
+//		
+//		for(j=0;j<KolvoFigurVFreime;j++)
+//		{
+//			KolvoTochekVFigure  = file_in_memory[n+sizeof(uint16_t)];
+//			printf("KolvoTochekVFigure = 0x%04X =%u;\n",KolvoTochekVFigure,KolvoTochekVFigure);
+//				
+//			KolvoByteVFigure = file_in_memory[n+sizeof(uint32_t)];
+//			printf("KolvoByteVFigure = 0x%04X =%u;\n",KolvoByteVFigure,KolvoByteVFigure);
+//			
+//			for(i=0;i<KolvoTochekVFigure;i++)
+//			{
+//				valueX = file_in_memory[n+sizeof(uint16_t)];
+//				valueY = file_in_memory[n+sizeof(uint16_t)];
+//				printf("valueX = 0x%04X =%6u;\tvalueY = 0x%04X =%6u;\n",valueX,valueX,valueY,valueY);
+//			}
+//		}
+//	}
+	
+	
+	
+	
 //  	printf("f_close:\n");
 //  	fresult = f_close(&file);
 //  	FR_print_error(fresult);
-// 	//=========================================================================
+	//=========================================================================
 	
 	
 	
@@ -458,8 +506,8 @@ int main(void)
 		STACK_SIZE_MIN, NULL, tskIDLE_PRIORITY, NULL );
 	xTaskCreate( vSendUart, (const signed char*)"vSendUart", 
 		STACK_SIZE_MIN, NULL, tskIDLE_PRIORITY, NULL );	
-	xTaskCreate( vReadSD, (const signed char*)"vReadSD", 
-		STACK_SIZE_MIN*10, NULL, tskIDLE_PRIORITY, NULL );
+ 	xTaskCreate( vReadSD, (const signed char*)"vReadSD", 
+ 		STACK_SIZE_MIN*10, NULL, tskIDLE_PRIORITY, NULL );
 	xTaskCreate( vOutToLaser, (const signed char*)"vOutToLaser", 
 		STACK_SIZE_MIN*10, NULL, tskIDLE_PRIORITY, NULL );
 		
@@ -470,87 +518,161 @@ int main(void)
 
 
 //******************************************************************************
-void vReadSD(void *pvParameters)
+
+/*
+// void vReadSD(void *pvParameters)
+// {
+// 	uint32_t 	i = 0;
+//  	uint32_t 	j = 0;
+//  	uint32_t 	k = 0;
+// 	uint32_t	Zagolovok[5] = {0,0,0,0,0};
+// 	uint32_t	KolvoFreimov = 0;
+// 	uint16_t	KolvoFigurVFreime = 0;
+// 	uint16_t	KolvoTochekVFigure = 0;
+// 	uint16_t	KolvoByteVFigure = 0;
+// 	uint16_t	valueX = 0;
+// 	uint16_t	valueY = 0;
+// 	
+// 	FATFS   	fs;
+// 	FIL     	file;
+// 	FRESULT		fresult;
+// 	TCHAR		filepath[] = {"0:sun.bin"};
+
+// 	printf("f_mount:\n");
+// 	fresult = f_mount(0, &fs);
+// 	FR_print_error(fresult);
+// 	
+
+// 	//=========================================================================
+// 	printf("f_open:\n");
+// 	fresult = f_open(&file, filepath, FA_OPEN_EXISTING | FA_READ);
+// 	FR_print_error(fresult);
+// 	
+// 	printf("f_read:\n");
+// 	f_read(&file,(uint8_t*)Zagolovok,sizeof(Zagolovok),0);
+// 	for(i=0;i<(sizeof(Zagolovok)/sizeof(uint32_t));++i)
+// 	{
+// 		printf("0x%06X =%u;  ",Zagolovok[i],Zagolovok[i]);
+// 	}
+// 	printf("\n");
+// 	KolvoFreimov = Zagolovok[0];
+// 	
+// 	for(k=0;k<(KolvoFreimov);k++)
+// 	{
+// 		f_read(&file,(void *)&KolvoFigurVFreime,sizeof(KolvoFigurVFreime),0);
+// 		printf("KolvoFigurVFreime = 0x%04X =%u;\n",KolvoFigurVFreime,KolvoFigurVFreime);
+// 		
+// 		for(j=0;j<KolvoFigurVFreime;j++)
+// 		{
+// 			f_read(&file,(void *)&KolvoTochekVFigure,sizeof(KolvoTochekVFigure),0);
+// 			printf("KolvoTochekVFigure = 0x%04X =%u;\n",KolvoTochekVFigure,KolvoTochekVFigure);
+// 				
+// 			f_read(&file,(void *)&KolvoByteVFigure,sizeof(KolvoByteVFigure),0);
+// 			printf("KolvoByteVFigure = 0x%04X =%u;\n",KolvoByteVFigure,KolvoByteVFigure);
+// 			
+// 			for(i=0;i<KolvoTochekVFigure;i++)
+// 			{
+// 				f_read(&file,(void *)&valueX,2,0);
+// 				f_read(&file,(void *)&valueY,2,0);
+// 				printf("valueX = 0x%04X =%6u;\tvalueY = 0x%04X =%6u;\n",valueX,valueX,valueY,valueY);
+// 			}
+// 		}
+// 	}
+// 		
+// 	printf("f_close:\n");
+// 	fresult = f_close(&file);
+// 	FR_print_error(fresult);
+// 	//=========================================================================
+// 	
+// 	for(;;)
+// 	{
+// 		//=========================================================================
+// 		vTaskDelay( 500 / portTICK_RATE_MS );
+// 	}
+// }
+*/
+uint32_t ReadToMemHeadILDA( FIL *fp, Head_ilda_t* Head_ilda )
 {
-	uint32_t 	i = 0;
- 	uint32_t 	j = 0;
- 	uint32_t 	k = 0;
-	uint32_t	Zagolovok[5] = {0,0,0,0,0};
-	uint32_t	KolvoFreimov = 0;
-	uint16_t	KolvoFigurVFreime = 0;
-	uint16_t	KolvoTochekVFigure = 0;
-	uint16_t	KolvoByteVFigure = 0;
-	uint16_t	valueX = 0;
-	uint16_t	valueY = 0;
-	
-	FATFS   	fs;
-	FIL     	file;
-	FRESULT		fresult;
-	TCHAR		filepath[] = {"0:sun.bin"};
-
-	printf("f_mount:\n");
-	fresult = f_mount(0, &fs);
-	FR_print_error(fresult);
-
-	//=========================================================================
-	printf("f_open:\n");
-	fresult = f_open(&file, filepath, FA_OPEN_EXISTING | FA_READ);
-	FR_print_error(fresult);
-	
+	printf("ReadToMemHeadILDA:%u\n",sizeof(Head_ilda_t));
 	printf("f_read:\n");
-	f_read(&file,(uint8_t*)Zagolovok,sizeof(Zagolovok),0);
-	for(i=0;i<(sizeof(Zagolovok)/sizeof(uint32_t));++i)
-	{
-		printf("0x%06X =%u;  ",Zagolovok[i],Zagolovok[i]);
-	}
-	printf("\n");
-	KolvoFreimov = Zagolovok[0];
+	f_read(fp,(void*)Head_ilda,sizeof(Head_ilda_t),0);
 	
-	for(k=0;k<(KolvoFreimov);k++)
-	{
-		f_read(&file,(void *)&KolvoFigurVFreime,sizeof(KolvoFigurVFreime),0);
-		printf("KolvoFigurVFreime = 0x%04X =%u;\n",KolvoFigurVFreime,KolvoFigurVFreime);
-		
-		for(j=0;j<KolvoFigurVFreime;j++)
-		{
-			f_read(&file,(void *)&KolvoTochekVFigure,sizeof(KolvoTochekVFigure),0);
-			printf("KolvoTochekVFigure = 0x%04X =%u;\n",KolvoTochekVFigure,KolvoTochekVFigure);
-				
-			f_read(&file,(void *)&KolvoByteVFigure,sizeof(KolvoByteVFigure),0);
-			printf("KolvoByteVFigure = 0x%04X =%u;\n",KolvoByteVFigure,KolvoByteVFigure);
-			
-			for(i=0;i<KolvoTochekVFigure;i++)
-			{
-				f_read(&file,(void *)&valueX,2,0);
-				f_read(&file,(void *)&valueY,2,0);
-				printf("valueX = 0x%04X =%6u;\tvalueY = 0x%04X =%6u;\n",valueX,valueX,valueY,valueY);
-			}
-		}
-	}
-		
-	printf("f_close:\n");
-	fresult = f_close(&file);
-	FR_print_error(fresult);
-	
-	for(;;)
-	{
-		//=========================================================================
-		vTaskDelay( 500 / portTICK_RATE_MS );
-	}
+	return sizeof(Head_ilda_t);
 }
 
-void vReadSDtmp(void *pvParameters)
+void PrintHeadILDA( Head_ilda_t * Head_ilda )
 {
-	File_ilda_t ilda;
-	Frame_t		frame;
+	printf("File.NumOfFrames:        %u\n",Head_ilda->NumOfFrames);
+	printf("File.NumOfRepeatFrames:  %u\n",Head_ilda->NumOfRepeatFrames);
+	printf("File.DelayBetweenFrames: %u\n",Head_ilda->DelayBetweenFrames);
+	printf("File.DelayBetweenPoints: %u\n",Head_ilda->DelayBetweenPoints);
+	printf("File.DelayLazerOnOff:    %u\n",Head_ilda->DelayLazerOnOff);
+}
+
+void ReadAllSizeFrame( FIL *fp, uint32_t * AdrOfFrame, uint32_t NumOfFrames )
+{
+	uint16_t SizeOfFrame = 0;
+	uint32_t i = 0;
+	
+	//=========================================================================
+	printf("ReadToMemNumOfFrame:%u byte\n",NumOfFrames);
+	AdrOfFrame = (uint32_t*)malloc(NumOfFrames * sizeof(uint32_t));
+	if (AdrOfFrame == NULL) 
+	{
+		printf("malloc dermo!\n");
+		return;
+	}
+	else printf("malloc OK!\n");
+	//=========================================================================
+	AdrOfFrame[0] = sizeof(Head_ilda_t);
+	printf("AdrNumOfFrame %u:%u byte\n",0,AdrOfFrame[0]);
+	
+	for(i=1;i<NumOfFrames;i++)
+	{
+		f_lseek(fp,(int)AdrOfFrame[i-1]);
+		f_read(fp,(void*)&SizeOfFrame,sizeof(SizeOfFrame),0);
+		AdrOfFrame[i] = AdrOfFrame[i-1] + SizeOfFrame;
+		printf("AdrNumOfFrame %u:%u byte\n",i,AdrOfFrame[i]);
+	}
+//	return sizeof(Head_ilda_t);
+}
+
+void ReadToMemFrameILDA( FIL *fp, uint8_t* frame, uint32_t PointerToFrame, uint32_t SizeOfFrame)
+{
+	
+	//=========================================================================
+ 	printf("SizeOfFrame:%u byte\n",SizeOfFrame);
+// 	frame = (uint8_t*)malloc(SizeOfFrame * sizeof(uint8_t));
+// 	if (frame == NULL) 
+// 	{
+// 		printf("malloc dermo!\n");
+// 		return;
+// 	}
+// 	else printf("malloc OK!\n");
+	//=========================================================================
+	
+// 	printf("PointerToFrame:%u\n",PointerToFrame);
+// 	f_lseek(fp,(int)PointerToFrame);
+// 	
+// 	printf("f_read:\n");
+// 	f_read(fp,(void*)frame,SizeOfFrame,0);
+}
+
+void vReadSD(void *pvParameters)
+{
+	Head_ilda_t Head_ilda;
 	FATFS   	fs;
 	FIL     	file;
 	FRESULT		fresult;
 	TCHAR		filepath[] = {"0:sun.bin"};
-	uint32_t	*FramePointer;
-	uint32_t	nFrame = 0;
+//	uint32_t	*FramePointer;
+//	uint32_t	nFrame = 0;
+	uint32_t	*AdrOfFrame;
+	uint8_t		*Frame;
 
- 	printf("f_mount:\n");
+	vTaskDelay( 100 / portTICK_RATE_MS );
+ 	
+	printf("f_mount:\n");
  	fresult = f_mount(0, &fs);
 	FR_print_error(fresult);
 
@@ -558,11 +680,12 @@ void vReadSDtmp(void *pvParameters)
 	fresult = f_open(&file, filepath, FA_OPEN_EXISTING | FA_READ);
 	FR_print_error(fresult);
 	
-	ReadToMemZag(&file,&ilda);
-	PrintILDA(&ilda);
-	FramePointer = (uint32_t*)malloc(sizeof(ilda.NumOfFrames) * ilda.NumOfFrames);
-	FramePointer[nFrame+1] = ReadToMem(&file,FramePointer[nFrame],&frame);
-
+	ReadToMemHeadILDA(&file,&Head_ilda);
+	PrintHeadILDA(&Head_ilda);
+	
+	ReadAllSizeFrame(&file,AdrOfFrame,Head_ilda.NumOfFrames);
+	
+	ReadToMemFrameILDA(&file,Frame,AdrOfFrame[0],AdrOfFrame[1]-AdrOfFrame[0]);
 
 	printf("f_close:\n");
 	fresult = f_close(&file);
@@ -570,6 +693,7 @@ void vReadSDtmp(void *pvParameters)
 	
 	for(;;)
 	{
+
 		//=========================================================================
 		vTaskDelay( 500 / portTICK_RATE_MS );
 	}
@@ -577,14 +701,17 @@ void vReadSDtmp(void *pvParameters)
 
 void vSendUart(void *pvParameters)
 {
+	uint32_t second=0;
 	UART_Configuration();
-	printf("UART_Configuration: DONE\n");
+	vTaskDelay( 10 / portTICK_RATE_MS );
+	printf("UART_Configuration_task: DONE\n");
 	
 	for(;;)
 	{
-		
+		second+=10;
+		printf("Blik Blue %u sec\n",second);
 		STM_EVAL_LEDToggle(LED_BLUE);
-		vTaskDelay( 500 / portTICK_RATE_MS );
+		vTaskDelay( 10000 / portTICK_RATE_MS );
 	}
 }
 
@@ -599,10 +726,11 @@ void vLedBlinkRed(void *pvParameters)
 
 void vLedBlinkGreen(void *pvParameters)
 {
-	RNG_Config();
+	//RNG_Config();
+	uint16_t tim = 100;
 	for(;;)
 	{
-		uint16_t tim = (uint16_t)(getRandom()>>22); // 10 bits = 0...1024 mSec
+		//uint16_t tim = (uint16_t)(getRandom()>>22); // 10 bits = 0...1024 mSec
 		STM_EVAL_LEDToggle(LED_GREEN);
 		vTaskDelay(  tim / portTICK_RATE_MS );
 	}
@@ -614,31 +742,25 @@ void vLedBlinkOrange(void *pvParameters)
 	for(;;)
 	{
 		
-		STM_EVAL_LEDToggle(LED_ORANGE);
+		//STM_EVAL_LEDToggle(LED_ORANGE);
 		vTaskDelay( 900 / portTICK_RATE_MS );
 	}
 }
 
 void vOutToLaser(void *pvParameters)
 {
-	uint32_t value=0;
-	uint16_t valueX=0;
-	uint16_t valueY=0;
 	RNG_Config();
 	initialization_set_xy();
 	GPIO_SetBits(TTL_GPIO, TTL);
 
+	init_timer6();
 	for(;;)
 	{
-		value = getRandom(); // 10 bits = 0...1024 mSec
-		valueX = (uint16_t) value;
-		valueY = (uint16_t) (value>>16);
 		
-		//printf("%u-%u\n",valueX,valueY );
-		
-		setXY(valueX, valueY);
-		vTaskDelay( 100 / portTICK_RATE_MS );
+		//====================================
+		vTaskDelay( 1000 / portTICK_RATE_MS );
 	}
 }
 //******************************************************************************
+
 
