@@ -591,6 +591,10 @@ int main(void)
 // 	}
 // }
 */
+
+uint32_t	*AdrOfFrame;
+
+
 uint32_t ReadToMemHeadILDA( FIL *fp, Head_ilda_t* Head_ilda )
 {
 	printf("ReadToMemHeadILDA:%u\n",sizeof(Head_ilda_t));
@@ -614,16 +618,7 @@ void ReadAllSizeFrame( FIL *fp, uint32_t * AdrOfFrame, uint32_t NumOfFrames )
 	uint16_t SizeOfFrame = 0;
 	uint32_t i = 0;
 	
-	//=========================================================================
-	printf("ReadToMemNumOfFrame:%u byte\n",NumOfFrames);
-	AdrOfFrame = (uint32_t*)malloc(NumOfFrames * sizeof(uint32_t));
-	if (AdrOfFrame == NULL) 
-	{
-		printf("malloc dermo!\n");
-		return;
-	}
-	else printf("malloc OK!\n");
-	//=========================================================================
+
 	AdrOfFrame[0] = sizeof(Head_ilda_t);
 	printf("AdrNumOfFrame %u:%u byte\n",0,AdrOfFrame[0]);
 	
@@ -639,23 +634,11 @@ void ReadAllSizeFrame( FIL *fp, uint32_t * AdrOfFrame, uint32_t NumOfFrames )
 
 void ReadToMemFrameILDA( FIL *fp, uint8_t* frame, uint32_t PointerToFrame, uint32_t SizeOfFrame)
 {
-	
-	//=========================================================================
- 	printf("SizeOfFrame:%u byte\n",SizeOfFrame);
-// 	frame = (uint8_t*)malloc(SizeOfFrame * sizeof(uint8_t));
-// 	if (frame == NULL) 
-// 	{
-// 		printf("malloc dermo!\n");
-// 		return;
-// 	}
-// 	else printf("malloc OK!\n");
-	//=========================================================================
-	
-// 	printf("PointerToFrame:%u\n",PointerToFrame);
-// 	f_lseek(fp,(int)PointerToFrame);
-// 	
-// 	printf("f_read:\n");
-// 	f_read(fp,(void*)frame,SizeOfFrame,0);
+ 	printf("PointerToFrame:%u\n",PointerToFrame);
+ 	f_lseek(fp,(int)PointerToFrame);
+ 	
+ 	printf("f_read:\n");
+ 	f_read(fp,(void*)frame,SizeOfFrame,0);
 }
 
 void vReadSD(void *pvParameters)
@@ -667,9 +650,10 @@ void vReadSD(void *pvParameters)
 	TCHAR		filepath[] = {"0:sun.bin"};
 //	uint32_t	*FramePointer;
 //	uint32_t	nFrame = 0;
-	uint32_t	*AdrOfFrame;
-	uint8_t		*Frame;
-
+//	uint32_t	*AdrOfFrame;
+	uint8_t		*Frame = 0;
+	uint8_t		i = 0;
+	uint32_t	SizeOfFrame;
 	vTaskDelay( 100 / portTICK_RATE_MS );
  	
 	printf("f_mount:\n");
@@ -683,10 +667,45 @@ void vReadSD(void *pvParameters)
 	ReadToMemHeadILDA(&file,&Head_ilda);
 	PrintHeadILDA(&Head_ilda);
 	
+	//=========================================================================
+	printf("ReadToMemNumOfFrame:%u byte\n",Head_ilda.NumOfFrames);
+	AdrOfFrame = (uint32_t*)malloc(Head_ilda.NumOfFrames * sizeof(uint32_t));
+	if (AdrOfFrame == NULL) 
+	{
+		printf("malloc dermo!\n");
+		return;
+	}
+	else printf("malloc OK!\n");
+	//=========================================================================
+	
 	ReadAllSizeFrame(&file,AdrOfFrame,Head_ilda.NumOfFrames);
 	
-	ReadToMemFrameILDA(&file,Frame,AdrOfFrame[0],AdrOfFrame[1]-AdrOfFrame[0]);
-
+	printf("\nQWE:\n");
+	for(i=0;i<Head_ilda.NumOfFrames;i++)
+		printf("AdrNumOfFrame %u:%u byte\n",i,AdrOfFrame[i]);
+	
+	SizeOfFrame = AdrOfFrame[1]-AdrOfFrame[0];
+	printf("SizeOfFrame: %u\n",SizeOfFrame);
+	
+	//=========================================================================
+ 	printf("SizeOfFrame:%u byte\n",SizeOfFrame);
+	Frame = (uint8_t*)malloc(SizeOfFrame * sizeof(uint8_t));
+	if (Frame == NULL) 
+	{
+		printf("malloc dermo!\n");
+		return;
+	}
+	else printf("malloc OK!\n");
+	//=========================================================================
+	
+	ReadToMemFrameILDA(&file,Frame,AdrOfFrame[0],SizeOfFrame);
+	
+	printf("Frame =\n");
+	for(i=0;i<SizeOfFrame;i++)
+		printf("%u:%X ",i,Frame[i]);
+	printf("\n");
+	
+	//=========================================================================
 	printf("f_close:\n");
 	fresult = f_close(&file);
 	FR_print_error(fresult);
