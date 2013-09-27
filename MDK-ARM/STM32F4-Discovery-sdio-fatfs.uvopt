@@ -242,10 +242,10 @@
       <FileType>1</FileType>
       <tvExp>0</tvExp>
       <Focus>0</Focus>
-      <ColumnNumber>4</ColumnNumber>
+      <ColumnNumber>22</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>564</TopLine>
-      <CurrentLine>713</CurrentLine>
+      <TopLine>130</TopLine>
+      <CurrentLine>256</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>..\main.c</PathWithFileName>
       <FilenameWithoutPath>main.c</FilenameWithoutPath>
@@ -306,10 +306,10 @@
       <FileType>1</FileType>
       <tvExp>0</tvExp>
       <Focus>0</Focus>
-      <ColumnNumber>40</ColumnNumber>
+      <ColumnNumber>20</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>0</TopLine>
-      <CurrentLine>0</CurrentLine>
+      <TopLine>29</TopLine>
+      <CurrentLine>67</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>..\set_xy.c</PathWithFileName>
       <FilenameWithoutPath>set_xy.c</FilenameWithoutPath>
@@ -528,7 +528,7 @@
 
   <Group>
     <GroupName>Discovery</GroupName>
-    <tvExp>0</tvExp>
+    <tvExp>1</tvExp>
     <tvExpOptDlg>0</tvExpOptDlg>
     <cbSel>0</cbSel>
     <RteFlg>0</RteFlg>
@@ -538,10 +538,10 @@
       <FileType>1</FileType>
       <tvExp>0</tvExp>
       <Focus>0</Focus>
-      <ColumnNumber>36</ColumnNumber>
+      <ColumnNumber>51</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>0</TopLine>
-      <CurrentLine>0</CurrentLine>
+      <TopLine>226</TopLine>
+      <CurrentLine>238</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>..\STM32F4_Discovery\discoveryf4utils.c</PathWithFileName>
       <FilenameWithoutPath>discoveryf4utils.c</FilenameWithoutPath>
@@ -576,7 +576,7 @@
       <GroupNumber>5</GroupNumber>
       <FileNumber>21</FileNumber>
       <FileType>1</FileType>
-      <tvExp>1</tvExp>
+      <tvExp>0</tvExp>
       <Focus>0</Focus>
       <ColumnNumber>27</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
@@ -634,10 +634,10 @@
       <FileType>1</FileType>
       <tvExp>0</tvExp>
       <Focus>0</Focus>
-      <ColumnNumber>0</ColumnNumber>
+      <ColumnNumber>9</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>2098</TopLine>
-      <CurrentLine>2308</CurrentLine>
+      <TopLine>2425</TopLine>
+      <CurrentLine>2440</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>..\fatfs\ff.c</PathWithFileName>
       <FilenameWithoutPath>ff.c</FilenameWithoutPath>

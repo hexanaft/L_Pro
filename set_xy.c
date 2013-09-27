@@ -42,7 +42,6 @@ void setXY(uint16_t valueX, uint16_t valueY)
 	GPIO_ResetBits(DAC_GPIO, DAC_DIN);
 	GPIO_ResetBits(DAC_GPIO, DAC_DIN2);
 	GPIO_ResetBits(DAC_GPIO, DAC_SYNC);
-	//delay(0xffff);
 	/*
 	while (count <= 7)
 	{
@@ -57,10 +56,10 @@ void setXY(uint16_t valueX, uint16_t valueY)
 	{
 		if ((valueX & mask) == 0)	GPIO_ResetBits(DAC_GPIO, DAC_DIN);
 		else GPIO_SetBits(DAC_GPIO, DAC_DIN);
-		//delay(0xffff);
+
 		if ((valueY & mask) == 0)	GPIO_ResetBits(DAC_GPIO, DAC_DIN2);
 		else GPIO_SetBits(DAC_GPIO, DAC_DIN2);
-		//delay(0xffff);
+
 		mask = mask >> 1;
 		count++;
 		
@@ -71,6 +70,6 @@ void setXY(uint16_t valueX, uint16_t valueY)
 		delayXY(0x7f);
 	}
 	GPIO_SetBits(DAC_GPIO, DAC_SYNC);
-	//delay(0xffff);
+
 }
 
