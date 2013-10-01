@@ -43,6 +43,7 @@
 ****/
 
 uint8_t		*Frame = 0;
+uint8_t		*FrameTmp = 0;
 uint32_t	*SizeOfFrame;
 
 #define STACK_SIZE_MIN	128	/* usStackDepth	- the stack size DEFINED IN WORDS.*/
@@ -248,17 +249,57 @@ void init_timer6()
 	NVIC_EnableIRQ(TIM6_DAC_IRQn);
 }
 
+void SetPointFromFrame( void )
+{
+	static uint32_t Pointer = 0;
+	static uint16_t CurrentFigure = 0;
+	static uint16_t CurrentPoint = 0;
+	static uint16_t NumOfFigures = 0;
+	static uint16_t NumOfPoints = 0;
+	
+	uint32_t value = 0;
+	uint16_t valueX = 0;
+	uint16_t valueY = 0;
+	
+	if( Pointer >= SizeOfFrame[0] )Pointer = 2;
+	NumOfFigures = toshort( &Frame[2] );
+
+	if( CurrentFigure < NumOfFigures )
+	{
+		if( CurrentPoint < NumOfPoints )
+		{
+			CurrentPoint++;
+			
+			Pointer += 2;
+			valueX = toshort( &Frame[Pointer] );
+			Pointer += 2;
+			valueY = toshort( &Frame[Pointer] );
+			//setXY(valueX, valueY);
+			printf("%u-%u\n",valueX,valueY );
+		}
+		else 
+		{
+			Pointer += 2;
+			NumOfPoints = toshort( &Frame[Pointer] );
+			
+			if( CurrentPoint == NumOfPoints )
+			{
+				CurrentPoint = 0;
+				CurrentFigure++;
+			}
+		}
+	}
+	else 
+	{
+		if( CurrentFigure == NumOfFigures ) CurrentFigure = 0;
+	};
+}
+
 void TIM6_DAC_IRQHandler()
 {
-	static uint32_t i = 0;
 	uint32_t value=0;
 	uint16_t valueX=0;
 	uint16_t valueY=0;
-	
-	static uint16_t j=0;
-	static uint16_t k=0;
-	static uint16_t NumOfFigures=0;
-	static uint16_t NumOfPoints=0;
 	
 	/* Так как этот обработчик вызывается и для ЦАП, нужно проверять,
 	* произошло ли прерывание по переполнению счётчика таймера TIM6.
@@ -281,39 +322,7 @@ void TIM6_DAC_IRQHandler()
 		}
 		else
 		{
-			if(i>=SizeOfFrame[0])i=2;
-			NumOfFigures = toshort( &Frame[2] );
-
-			if(j<NumOfFigures)
-			{
-				if(k<NumOfPoints)
-				{
-					k++;
-					
-					i+=2;
-					valueX = toshort( &Frame[i] );
-					i+=2;
-					valueY = toshort( &Frame[i] );
-					//setXY(valueX, valueY);
-					printf("%u-%u\n",valueX,valueY );
-				}
-				else 
-				{
-					i+=2;
-					NumOfPoints = toshort( &Frame[i] );
-					
-					if(k==NumOfPoints)
-					{
-						k=0;
-						j++;
-					}
-				}
-			}
-			else 
-			{
-				//j++;
-				if(j==NumOfFigures)j=0;
-			};
+			SetPointFromFrame();
 		}
 	}
 }
@@ -795,12 +804,12 @@ void vReadSD(void *pvParameters)
 	
 	
 	///////////////////////////////////////////////////////////////////////////
-	//=========================================================================
+	
 //	for(i=0;i<Head_ilda.NumOfFrames;i++)
 //	{
-	i=0;
+		i=0;
 		if(Frame != NULL)free((void*)Frame);
-		
+		//=========================================================================
 		printf("SizeOfFrame:%u byte\n",SizeOfFrame[i]);
 		printf("malloc Frame:%u byte\n",SizeOfFrame[i]);
 		Frame = (uint8_t*)malloc(SizeOfFrame[i] * sizeof(uint8_t));
@@ -831,7 +840,7 @@ void vReadSD(void *pvParameters)
 	{
 
 		//=========================================================================
-		vTaskDelay( 500 / portTICK_RATE_MS );
+		vTaskDelay( 400 / portTICK_RATE_MS );
 	}
 }
 
