@@ -22,5 +22,8 @@ void delayLas(uint32_t counter3);
 void delayXY(uint32_t counter2);
 void setXY(uint16_t valueX, uint16_t valueY);
 
+void LaserOn( void );
+void LaserOff( void );
+
 #endif /* __SET_XY_H */
 //******************************************************************************

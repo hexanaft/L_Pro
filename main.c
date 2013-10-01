@@ -42,9 +42,10 @@
   * PC.02	 to GND ( Card Detect )
 ****/
 
-uint8_t		*Frame = 0;
-uint8_t		*FrameTmp = 0;
+uint8_t	*Frame = 0;
+volatile uint8_t	frp = 0;
 uint32_t	*SizeOfFrame;
+volatile uint8_t	nSizeOfFrame = 0;
 
 #define STACK_SIZE_MIN	128	/* usStackDepth	- the stack size DEFINED IN WORDS.*/
 
@@ -55,6 +56,37 @@ void vLedBlinkOrange(void *pvParameters);
 void vSendUart(void *pvParameters);
 void vOutToLaser(void *pvParameters);
 
+
+void PrintFromMemFrameILDA( uint8_t* frame, uint32_t SizeOfFrame )
+{
+	uint32_t i=0;
+	uint16_t j=0;
+	uint16_t k=0;
+	uint16_t NumOfFigures=0;
+	uint16_t NumOfPoints=0;
+	printf("Frame =\n");
+	for(i=0;i<SizeOfFrame;i++)
+		printf("%u:%X ",i,frame[i]);
+	printf("\n");
+//	i=0;
+//	printf("KolvoByteVFreime = 0x%04X =%u;\n",toshort( &frame[i] ),toshort( &frame[i] ));
+//	i+=2;
+//	printf("KolvoFigurVFreime = 0x%04X =%u;\n",toshort( &frame[i] ),toshort( &frame[i]));
+//	NumOfFigures = toshort( &frame[i] );
+//	i+=2;
+//	printf("KolvoTochekVFigure = 0x%04X =%u;\n",toshort( &frame[i] ),toshort( &frame[i]));
+//	NumOfPoints = toshort( &frame[i] );
+//	for(j=0;j<NumOfFigures;j++)
+//	{
+//		for(k=0;k<NumOfPoints;k++)
+//		{
+//			i+=2;
+//			printf("X = 0x%04X =%5u; ",toshort( &frame[i] ),toshort( &frame[i]));
+//			i+=2;
+//			printf("Y = 0x%04X =%5u;\n",toshort( &frame[i] ),toshort( &frame[i]));
+//		}
+//	}
+}
 
 typedef struct
 {
@@ -231,7 +263,7 @@ void init_timer6()
 	*/
 	TIM_TimeBaseStructInit(&base_timer);
 	/* Делитель учитывается как TIM_Prescaler + 1, поэтому отнимаем 1 */
-	base_timer.TIM_Prescaler = 840; //- 1; зачем -1 ???  							// 84000000 /840 = 100000
+	base_timer.TIM_Prescaler = 84; //- 1; зачем -1 ???  							// 84000000 /840 = 100000
 	base_timer.TIM_Period = 5000;	// 1 секунда при 8400 делителе и 10000 таймере. // 100000 /200 = 500 раз в сек будет прерывание
 	TIM_TimeBaseInit(TIM6, &base_timer);
 
@@ -257,25 +289,39 @@ void SetPointFromFrame( void )
 	static uint16_t NumOfFigures = 0;
 	static uint16_t NumOfPoints = 0;
 	
-	uint32_t value = 0;
+	static uint8_t lfrp = 0;
+	
 	uint16_t valueX = 0;
 	uint16_t valueY = 0;
 	
-	if( Pointer >= SizeOfFrame[0] )Pointer = 2;
+	
+	if(lfrp != frp)
+	{
+		Pointer = 0;
+		CurrentFigure = 0;
+		CurrentPoint = 0;
+		NumOfFigures = 0;
+		NumOfPoints = 0;
+		//PrintFromMemFrameILDA(Frame, SizeOfFrame[nSizeOfFrame]);
+	}
+	else lfrp = frp;
+	
+	if( Pointer >= SizeOfFrame[nSizeOfFrame] )Pointer = 2;
 	NumOfFigures = toshort( &Frame[2] );
 
 	if( CurrentFigure < NumOfFigures )
 	{
 		if( CurrentPoint < NumOfPoints )
 		{
-			CurrentPoint++;
-			
-			Pointer += 2;
-			valueX = toshort( &Frame[Pointer] );
 			Pointer += 2;
 			valueY = toshort( &Frame[Pointer] );
-			//setXY(valueX, valueY);
-			printf("%u-%u\n",valueX,valueY );
+			Pointer += 2;
+			valueX = toshort( &Frame[Pointer] );
+			setXY(valueX, valueY);
+			//printf("%u-%u\n",valueX,valueY );
+			//if( CurrentPoint == 0 )LaserOn();
+			
+			CurrentPoint++;
 		}
 		else 
 		{
@@ -286,6 +332,7 @@ void SetPointFromFrame( void )
 			{
 				CurrentPoint = 0;
 				CurrentFigure++;
+				//LaserOff();
 			}
 		}
 	}
@@ -339,36 +386,6 @@ int main(void)
 	   system_stm32f4xx.c file
 	 */
 
-	//=========================================================================
-// 	uint32_t 	i = 0;
-// //	uint32_t 	n = 0;
-// 	uint32_t 	fsize = 0;
-// //	uint32_t 	random32bit;
-// //	uint8_t 	Buff[24]= {0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0};
-// 		
-// //	uint32_t	Zagolovok[5] = {0,0,0,0,0};
-// //	uint32_t	KolvoFreimov = 0;
-// //	uint16_t	KolvoFigurVFreime = 0;
-// //	uint16_t	KolvoTochekVFigure = 0;
-// //	uint16_t	KolvoByteVFigure = 0;
-// //	uint16_t	valueX = 0;
-// //	uint16_t	valueY = 0;
-// 	
-// 	FATFS   	fs;
-// 	FIL     	file;
-// 	FRESULT		fresult;
-// 	FILINFO		filinfo;
-// 	DIR			dir;
-// 	TCHAR		buffstr[100];
-// 	TCHAR		filename[16];
-// 	TCHAR		filepath[] = {"0:sun.bin"};
-// //	FILINFO *filinfo;
-// 	uint8_t *file_in_memory = NULL;
-// //	Head_ilda nfile;
-// 	
-// //	uint32_t *pint;
-	//=========================================================================
-
 	/*!< Most systems default to the wanted configuration, with the noticeable 
 		exception of the STM32 driver library. If you are using an STM32 with 
 		the STM32 driver library then ensure all the priority bits are assigned 
@@ -383,21 +400,7 @@ int main(void)
 	STM_EVAL_LEDInit(LED_ORANGE);
 	STM_EVAL_LEDInit(LED_RED);
 	//=========================================================================
-	
-// 	//=========================================================================
-// 	RNG_Config();
-// 	initialization_set_xy();
-// 	GPIO_SetBits(GPIOA, TTL);
-// 	
-// 	for(;;)
-// 	{
-// 		uint32_t value = getRandom(); // 10 bits = 0...1024 mSec
-// 		setXY(((uint16_t) value), ((uint16_t) (value>>16)));
-// 		//vTaskDelay( 1 / portTICK_RATE_MS );
-// 		delayXY(50000);
-// 	}
-// 	//=========================================================================
-	
+
 	#ifdef SD_DMA_MODE
 	SD_NVIC_Configuration();
 	#endif
@@ -578,7 +581,7 @@ int main(void)
 
 //******************************************************************************
 
-
+/*
 void vReadSD1(void *pvParameters)
 {
 	uint32_t 	i = 0;
@@ -656,7 +659,7 @@ void vReadSD1(void *pvParameters)
 		vTaskDelay( 500 / portTICK_RATE_MS );
 	}
 }
-
+*/
 
 
 
@@ -699,43 +702,13 @@ void ReadAllSizeFrame( FIL *fp, uint32_t NumOfFrames, uint32_t * AdrOfFrame, uin
 
 void ReadToMemFrameILDA( FIL *fp, uint8_t* frame, uint32_t PointerToFrame, uint32_t SizeOfFrame)
 {
- 	printf("PointerToFrame:%u\n",PointerToFrame);
+ 	//printf("PointerToFrame:%u\n",PointerToFrame);
  	f_lseek(fp,(int)PointerToFrame);
  	
- 	printf("f_read:\n");
+ 	//printf("f_read:\n");
  	f_read(fp,(void*)frame,SizeOfFrame,0);
 }
 
-PrintFromMemFrameILDA( uint8_t* frame, uint32_t SizeOfFrame )
-{
-	uint32_t i=0;
-	uint16_t j=0;
-	uint16_t k=0;
-	uint16_t NumOfFigures=0;
-	uint16_t NumOfPoints=0;
-	printf("Frame =\n");
-	for(i=0;i<SizeOfFrame;i++)
-		printf("%u:%X ",i,frame[i]);
-	printf("\n");
-	i=0;
-	printf("KolvoByteVFreime = 0x%04X =%u;\n",toshort( &frame[i] ),toshort( &frame[i] ));
-	i+=2;
-	printf("KolvoFigurVFreime = 0x%04X =%u;\n",toshort( &frame[i] ),toshort( &frame[i]));
-	NumOfFigures = toshort( &frame[i] );
-	i+=2;
-	printf("KolvoTochekVFigure = 0x%04X =%u;\n",toshort( &frame[i] ),toshort( &frame[i]));
-	NumOfPoints = toshort( &frame[i] );
-	for(j=0;j<NumOfFigures;j++)
-	{
-		for(k=0;k<NumOfPoints;k++)
-		{
-			i+=2;
-			printf("X = 0x%04X =%5u; ",toshort( &frame[i] ),toshort( &frame[i]));
-			i+=2;
-			printf("Y = 0x%04X =%5u;\n",toshort( &frame[i] ),toshort( &frame[i]));
-		}
-	}
-}
 
 
 void vReadSD(void *pvParameters)
@@ -749,10 +722,12 @@ void vReadSD(void *pvParameters)
 	uint32_t	*PointerToFrame;
 	//uint32_t	*SizeOfFrame;
 
-	uint16_t	word;
-	uint32_t	dword;
+//	uint16_t	word;
+//	uint32_t	dword;
 
 	uint8_t		i = 0;
+	uint8_t		time = 0;
+	uint8_t 	* frame[2] = {NULL,NULL};
 
 	//+++++++++++++++++++++++++++++++++++
 	vTaskDelay( 100 / portTICK_RATE_MS );
@@ -803,45 +778,64 @@ void vReadSD(void *pvParameters)
 	
 	
 	
-	///////////////////////////////////////////////////////////////////////////
+	i=0;
+	if(frame[0] != NULL)free((void*)frame[0]);
+	//=========================================================================
+	printf("SizeOfFrame:%u byte\n",SizeOfFrame[i]);
+	printf("malloc Frame:%u byte\n",SizeOfFrame[i]);
+	frame[0] = (uint8_t*)malloc(SizeOfFrame[i] * sizeof(uint8_t));
+	if (frame[0] == NULL) 
+	{
+		printf("malloc dermo!\n");
+		return;
+	}
+	else printf("malloc OK!\n");
+	//=========================================================================
 	
-//	for(i=0;i<Head_ilda.NumOfFrames;i++)
-//	{
-		i=0;
-		if(Frame != NULL)free((void*)Frame);
+	ReadToMemFrameILDA(&file,frame[0],PointerToFrame[i],SizeOfFrame[i]);
+	PrintFromMemFrameILDA(frame[0],SizeOfFrame[i]);
+	Frame = frame[0];
+	init_timer6();
+
+	for(;;)
+	{
+		frp++;
+		if(frp > 1)frp=0;
+		
+		i++;
+		if(i>=Head_ilda.NumOfFrames)i=0;
+		printf("NumOfFrame:%3u, frp = %3u\n",i,frp);
+		nSizeOfFrame = i;
+		
+		//if(Frame != NULL)
+		free((void*)frame[frp]);
+		
 		//=========================================================================
 		printf("SizeOfFrame:%u byte\n",SizeOfFrame[i]);
 		printf("malloc Frame:%u byte\n",SizeOfFrame[i]);
-		Frame = (uint8_t*)malloc(SizeOfFrame[i] * sizeof(uint8_t));
-		if (Frame == NULL) 
+		frame[frp] = (uint8_t*)malloc(SizeOfFrame[i] * sizeof(uint8_t) +10);
+		if (frame[frp] == NULL) 
 		{
 			printf("malloc dermo!\n");
 			return;
 		}
 		else printf("malloc OK!\n");
 		//=========================================================================
+		//ReadToMemFrameILDA(&file,Frame,PointerToFrame[i],SizeOfFrame[i]);
+		f_lseek(&file,(int)PointerToFrame[i]);
+		f_read(&file,(void*)frame[frp],SizeOfFrame[i],0);
+		//PrintFromMemFrameILDA(frame[frp],SizeOfFrame[i]);
+		Frame = frame[frp];
+
+		//=========================================================================
+		vTaskDelay( 1000 / portTICK_RATE_MS );
+	}
 		
-		ReadToMemFrameILDA(&file,Frame,PointerToFrame[i],SizeOfFrame[i]);
-		PrintFromMemFrameILDA(Frame,SizeOfFrame[i]);
-		init_timer6();
-//	}
-	///////////////////////////////////////////////////////////////////////////
-	
-	// ((координаты * 4) +2) +2
-	
-	
 	//=========================================================================
 	printf("f_close:\n");
 	fresult = f_close(&file);
 	FR_print_error(fresult);
 	
-	
-	for(;;)
-	{
-
-		//=========================================================================
-		vTaskDelay( 400 / portTICK_RATE_MS );
-	}
 }
 
 void vSendUart(void *pvParameters)
@@ -896,7 +890,7 @@ void vOutToLaser(void *pvParameters)
 {
 	RNG_Config();
 	initialization_set_xy();
-	GPIO_SetBits(TTL_GPIO, TTL);
+	LaserOn();
 
 	STM_EVAL_PBInit(BUTTON_USER,BUTTON_MODE_GPIO);
 	

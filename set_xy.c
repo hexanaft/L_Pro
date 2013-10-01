@@ -1,5 +1,15 @@
 #include "set_xy.h"
 
+void LaserOn( void )
+{
+	GPIO_SetBits(TTL_GPIO, TTL);
+}
+
+void LaserOff( void )
+{
+	GPIO_ResetBits(TTL_GPIO, TTL);
+}
+
 void initialization_set_xy( void )
 {
 	GPIO_InitTypeDef	port;
