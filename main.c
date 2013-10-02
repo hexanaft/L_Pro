@@ -281,6 +281,19 @@ void init_timer6()
 	NVIC_EnableIRQ(TIM6_DAC_IRQn);
 }
 
+void SetPointRandom( void )
+{
+	uint32_t value=0;
+	uint16_t valueX=0;
+	uint16_t valueY=0;
+	
+	value = getRandom(); // 10 bits = 0...1024 mSec
+	valueX = (uint16_t) value;
+	valueY = (uint16_t) (value>>16);
+	setXY(valueX, valueY);
+	//printf("%u-%u\n",valueX,valueY );
+}
+
 void SetPointFromFrame( void )
 {
 	static uint32_t Pointer = 0;
@@ -297,16 +310,16 @@ void SetPointFromFrame( void )
 	
 	if(lfrp != frp)
 	{
+		lfrp = frp;
 		Pointer = 0;
 		CurrentFigure = 0;
 		CurrentPoint = 0;
 		NumOfFigures = 0;
 		NumOfPoints = 0;
-		//PrintFromMemFrameILDA(Frame, SizeOfFrame[nSizeOfFrame]);
+		PrintFromMemFrameILDA(Frame, SizeOfFrame[nSizeOfFrame]);
 	}
-	else lfrp = frp;
 	
-	if( Pointer >= SizeOfFrame[nSizeOfFrame] )Pointer = 2;
+	if( Pointer >= SizeOfFrame[nSizeOfFrame] )Pointer = 4;
 	NumOfFigures = toshort( &Frame[2] );
 
 	if( CurrentFigure < NumOfFigures )
@@ -314,10 +327,11 @@ void SetPointFromFrame( void )
 		if( CurrentPoint < NumOfPoints )
 		{
 			Pointer += 2;
-			valueY = toshort( &Frame[Pointer] );
-			Pointer += 2;
 			valueX = toshort( &Frame[Pointer] );
+			Pointer += 2;
+			valueY = toshort( &Frame[Pointer] );
 			setXY(valueX, valueY);
+			printf("P:%04u X:%04X-Y:%04X\n",Pointer,valueX,valueY );
 			//printf("%u-%u\n",valueX,valueY );
 			//if( CurrentPoint == 0 )LaserOn();
 			
@@ -344,10 +358,6 @@ void SetPointFromFrame( void )
 
 void TIM6_DAC_IRQHandler()
 {
-	uint32_t value=0;
-	uint16_t valueX=0;
-	uint16_t valueY=0;
-	
 	/* Так как этот обработчик вызывается и для ЦАП, нужно проверять,
 	* произошло ли прерывание по переполнению счётчика таймера TIM6.
 	*/
@@ -356,16 +366,11 @@ void TIM6_DAC_IRQHandler()
 		/* Очищаем бит обрабатываемого прерывания */
 		TIM_ClearITPendingBit(TIM6, TIM_IT_Update);
 		
-		if( STM_EVAL_PBGetState(BUTTON_USER) == 0 )
+		if( STM_EVAL_PBGetState(BUTTON_USER) == 1 )
 		{
 			/* Инвертируем состояние светодиодов */
 			STM_EVAL_LEDToggle(LED_ORANGE);
-			
-			value = getRandom(); // 10 bits = 0...1024 mSec
-			valueX = (uint16_t) value;
-			valueY = (uint16_t) (value>>16);
-			setXY(valueX, valueY);
-			//printf("%u-%u\n",valueX,valueY );
+			SetPointRandom();
 		}
 		else
 		{
@@ -729,6 +734,8 @@ void vReadSD(void *pvParameters)
 	uint8_t		time = 0;
 	uint8_t 	* frame[2] = {NULL,NULL};
 
+	uint8_t		click = 0;
+
 	//+++++++++++++++++++++++++++++++++++
 	vTaskDelay( 100 / portTICK_RATE_MS );
  	
@@ -776,8 +783,6 @@ void vReadSD(void *pvParameters)
 		printf("SizeOfFrame %u:%u byte\n",i,SizeOfFrame[i]);
 	///////////////////////////////////////////////////////////////////////////
 	
-	
-	
 	i=0;
 	if(frame[0] != NULL)free((void*)frame[0]);
 	//=========================================================================
@@ -799,36 +804,46 @@ void vReadSD(void *pvParameters)
 
 	for(;;)
 	{
-		frp++;
-		if(frp > 1)frp=0;
-		
-		i++;
-		if(i>=Head_ilda.NumOfFrames)i=0;
-		printf("NumOfFrame:%3u, frp = %3u\n",i,frp);
-		nSizeOfFrame = i;
-		
-		//if(Frame != NULL)
-		free((void*)frame[frp]);
-		
-		//=========================================================================
-		printf("SizeOfFrame:%u byte\n",SizeOfFrame[i]);
-		printf("malloc Frame:%u byte\n",SizeOfFrame[i]);
-		frame[frp] = (uint8_t*)malloc(SizeOfFrame[i] * sizeof(uint8_t) +10);
-		if (frame[frp] == NULL) 
+		if( STM_EVAL_PBGetState(BUTTON_USER) == 1 )
 		{
-			printf("malloc dermo!\n");
-			return;
+			click = 1;
 		}
-		else printf("malloc OK!\n");
+		else{
+			if( click == 1 )
+			{
+				click = 0;
+				
+				frp++;
+				if(frp > 1)frp=0;
+				
+				i++;
+				if(i>=Head_ilda.NumOfFrames)i=0;
+				printf("NumOfFrame:%3u, frp = %3u\n",i,frp);
+				nSizeOfFrame = i;
+				
+				//if(Frame != NULL)
+				free((void*)frame[frp]);
+				
+				//=========================================================================
+				printf("SizeOfFrame:%u byte\n",SizeOfFrame[i]);
+				printf("malloc Frame:%u byte\n",SizeOfFrame[i]);
+				frame[frp] = (uint8_t*)malloc(SizeOfFrame[i] * sizeof(uint8_t));
+				if (frame[frp] == NULL) 
+				{
+					printf("malloc dermo!\n");
+					return;
+				}
+				else printf("malloc OK!\n");
+				//=========================================================================
+				//ReadToMemFrameILDA(&file,Frame,PointerToFrame[i],SizeOfFrame[i]);
+				f_lseek(&file,(int)PointerToFrame[i]);
+				f_read(&file,(void*)frame[frp],SizeOfFrame[i],0);
+				//PrintFromMemFrameILDA(frame[frp],SizeOfFrame[i]);
+				Frame = frame[frp];
+			}
+		}
 		//=========================================================================
-		//ReadToMemFrameILDA(&file,Frame,PointerToFrame[i],SizeOfFrame[i]);
-		f_lseek(&file,(int)PointerToFrame[i]);
-		f_read(&file,(void*)frame[frp],SizeOfFrame[i],0);
-		//PrintFromMemFrameILDA(frame[frp],SizeOfFrame[i]);
-		Frame = frame[frp];
-
-		//=========================================================================
-		vTaskDelay( 1000 / portTICK_RATE_MS );
+		vTaskDelay( 10 / portTICK_RATE_MS );
 	}
 		
 	//=========================================================================
@@ -897,7 +912,7 @@ void vOutToLaser(void *pvParameters)
 	//init_timer6();
 	for(;;)
 	{
-		
+	
 		//====================================
 		vTaskDelay( 1000 / portTICK_RATE_MS );
 	}
