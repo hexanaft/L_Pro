@@ -39,7 +39,7 @@
   * PC.08    |      SDIO D0                |   D0          |    8        |	|-Pin 8			|
   * PC.09    |      SDIO D1                |   D1          |    9        |	|-Pin 9			|
   *          +-----------------------------+---------------+-------------+	+---------------+
-  * PC.02	 to GND ( Card Detect )
+  * PC.07	 to GND ( Card Detect )
 ****/
 
 uint8_t	*Frame = 0;
