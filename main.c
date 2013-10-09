@@ -46,6 +46,7 @@ uint8_t	*Frame = 0;
 volatile uint8_t	frp = 0;
 uint32_t	*SizeOfFrame;
 volatile uint8_t	nSizeOfFrame = 0;
+volatile uint8_t FrameFirstShow = 0;
 
 #define STACK_SIZE_MIN	128	/* usStackDepth	- the stack size DEFINED IN WORDS.*/
 
@@ -60,10 +61,10 @@ void vOutToLaser(void *pvParameters);
 void PrintFromMemFrameILDA( uint8_t* frame, uint32_t SizeOfFrame )
 {
 	uint32_t i=0;
-	uint16_t j=0;
-	uint16_t k=0;
-	uint16_t NumOfFigures=0;
-	uint16_t NumOfPoints=0;
+// 	uint16_t j=0;
+// 	uint16_t k=0;
+// 	uint16_t NumOfFigures=0;
+// 	uint16_t NumOfPoints=0;
 	printf("Frame =\n");
 	for(i=0;i<SizeOfFrame;i++)
 		printf("%u:%X ",i,frame[i]);
@@ -249,7 +250,7 @@ uint32_t ReadToMem( FIL *fp, uint32_t FramePointer, Frame_t* frame )
 */
 
 //******************************************************************************
-void init_timer6()
+void init_timer6( uint16_t DelayBetweenPoints )
 {
 	TIM_TimeBaseInitTypeDef base_timer;
 	
@@ -263,8 +264,8 @@ void init_timer6()
 	*/
 	TIM_TimeBaseStructInit(&base_timer);
 	/* Делитель учитывается как TIM_Prescaler + 1, поэтому отнимаем 1 */
-	base_timer.TIM_Prescaler = 42; //- 1; зачем -1 ???  							// 84000000 /840 = 100000
-	base_timer.TIM_Period = 1500;	// 1 секунда при 8400 делителе и 10000 таймере. // 100000 /200 = 500 раз в сек будет прерывание
+	base_timer.TIM_Prescaler = 84; //- 1; зачем -1 ???  							// 84000000 /840 = 100000
+	base_timer.TIM_Period = DelayBetweenPoints;	// 1 секунда при 8400 делителе и 10000 таймере. // 100000 /200 = 500 раз в сек будет прерывание
 	TIM_TimeBaseInit(TIM6, &base_timer);
 
 	/* Разрешаем прерывание по обновлению (в данном случае -
@@ -279,6 +280,13 @@ void init_timer6()
 	* отвечает и за опустошение ЦАП.
 	*/
 	NVIC_EnableIRQ(TIM6_DAC_IRQn);
+}
+
+void StopTimer6( void )
+{
+	NVIC_DisableIRQ(TIM6_DAC_IRQn);
+	TIM_Cmd(TIM6, DISABLE);
+	LaserOff(); 
 }
 
 void SetPointRandom( void )
@@ -338,7 +346,11 @@ void SetPointFromFrame( void )
 			Pointer += 2;
 			valueY = toshort( &Frame[Pointer] );
 			setXY(~valueX, valueY);
-			if (CurrentPoint == 0) LaserOn();
+			if (CurrentPoint == 0) 
+			{
+				//delayXY(0xff);
+				LaserOn();
+			}
 			//printf("P:%04u X:%04X-Y:%04X\n",Pointer,valueX,valueY );
 			//printf("%u-%u\n",valueX,valueY );
 			
@@ -361,7 +373,11 @@ void SetPointFromFrame( void )
 				LaserOff();
 			//}
 		}
-		if( CurrentFigure == NumOfFigures ) CurrentFigure = 0;
+		if( CurrentFigure == NumOfFigures ) 
+		{
+			CurrentFigure = 0;
+			FrameFirstShow = 1;
+		}
 	}
 	//CurrentFigure = 0;
 	//else if( CurrentFigure == NumOfFigures ) CurrentFigure = 0;
@@ -726,35 +742,49 @@ void ReadToMemFrameILDA( FIL *fp, uint8_t* frame, uint32_t PointerToFrame, uint3
  	f_read(fp,(void*)frame,SizeOfFrame,0);
 }
 
+void WaitUntilFrameIsFirstShown( void )
+{
+	while( FrameFirstShow != 1 )
+	{
+		taskYIELD();
+	};
+	FrameFirstShow = 0;
+}
+
+uint8_t ButtonClickUp( void )
+{
+	static uint8_t click = 0;
+	
+	if( STM_EVAL_PBGetState(BUTTON_USER) )
+	{
+		click = 1;
+		return 0;
+	}
+	else
+	{
+		if( click == 1 )
+		{
+			click = 0;
+			return 1;
+		}
+	}
+	return 0;
+}
 
 
-void vReadSD(void *pvParameters)
+FATFS   	fs;
+FRESULT		fresult;
+
+void SetFileToOut( const TCHAR * filepath )
 {
 	Head_ilda_t Head_ilda;
-	FATFS   	fs;
 	FIL     	file;
-	FRESULT		fresult;
-	TCHAR		filepath[] = {"0:test2.bin"};
-
 	uint32_t	*PointerToFrame;
-	//uint32_t	*SizeOfFrame;
-
-//	uint16_t	word;
-//	uint32_t	dword;
-
 	uint8_t		i = 0;
-	uint8_t		time = 0;
+//	uint8_t		time = 0;
 	uint8_t 	* frame[2] = {NULL,NULL};
 
-	uint8_t		click = 0;
-
 	//+++++++++++++++++++++++++++++++++++
-	vTaskDelay( 100 / portTICK_RATE_MS );
- 	
-	printf("f_mount:\n");
- 	fresult = f_mount(0, &fs);
-	FR_print_error(fresult);
-
 	printf("f_open:\n");
 	fresult = f_open(&file, filepath, FA_OPEN_EXISTING | FA_READ);
 	FR_print_error(fresult);
@@ -812,57 +842,75 @@ void vReadSD(void *pvParameters)
 	ReadToMemFrameILDA(&file,frame[0],PointerToFrame[i],SizeOfFrame[i]);
 	PrintFromMemFrameILDA(frame[0],SizeOfFrame[i]);
 	Frame = frame[0];
-	init_timer6();
+	init_timer6( Head_ilda.DelayBetweenPoints );//(130);//
 
-	for(;;)
+	//for(;;)
+	while( !ButtonClickUp())
 	{
-		if( STM_EVAL_PBGetState(BUTTON_USER) == 1 )
+		if( Head_ilda.NumOfFrames > 1 )
 		{
-			click = 1;
-		}
-		else{
-			if( click == 1 )
+			WaitUntilFrameIsFirstShown();
+			frp++;
+			if(frp > 1)frp=0;
+			
+			i++;
+			if(i>=Head_ilda.NumOfFrames)i=0;
+			printf("NumOfFrame:%3u, frp = %3u\n",i,frp);
+			nSizeOfFrame = i;
+			
+			//if(Frame != NULL)
+			free((void*)frame[frp]);
+			
+			//=========================================================================
+			printf("SizeOfFrame:%u byte\n",SizeOfFrame[i]);
+			printf("malloc Frame:%u byte\n",SizeOfFrame[i]);
+			frame[frp] = (uint8_t*)malloc(SizeOfFrame[i] * sizeof(uint8_t));
+			if (frame[frp] == NULL) 
 			{
-				click = 0;
-				
-				frp++;
-				if(frp > 1)frp=0;
-				
-				i++;
-				if(i>=Head_ilda.NumOfFrames)i=0;
-				printf("NumOfFrame:%3u, frp = %3u\n",i,frp);
-				nSizeOfFrame = i;
-				
-				//if(Frame != NULL)
-				free((void*)frame[frp]);
-				
-				//=========================================================================
-				printf("SizeOfFrame:%u byte\n",SizeOfFrame[i]);
-				printf("malloc Frame:%u byte\n",SizeOfFrame[i]);
-				frame[frp] = (uint8_t*)malloc(SizeOfFrame[i] * sizeof(uint8_t));
-				if (frame[frp] == NULL) 
-				{
-					printf("malloc dermo!\n");
-					return;
-				}
-				else printf("malloc OK!\n");
-				//=========================================================================
-				//ReadToMemFrameILDA(&file,Frame,PointerToFrame[i],SizeOfFrame[i]);
-				f_lseek(&file,(int)PointerToFrame[i]);
-				f_read(&file,(void*)frame[frp],SizeOfFrame[i],0);
-				//PrintFromMemFrameILDA(frame[frp],SizeOfFrame[i]);
-				Frame = frame[frp];
+				printf("malloc dermo!\n");
+				return;
 			}
+			else printf("malloc OK!\n");
+			//=========================================================================
+			//ReadToMemFrameILDA(&file,Frame,PointerToFrame[i],SizeOfFrame[i]);
+			f_lseek(&file,(int)PointerToFrame[i]);
+			f_read(&file,(void*)frame[frp],SizeOfFrame[i],0);
+			//PrintFromMemFrameILDA(frame[frp],SizeOfFrame[i]);
+			
+			Frame = frame[frp];
 		}
 		//=========================================================================
-		vTaskDelay( 10 / portTICK_RATE_MS );
+		vTaskDelay( 300 / portTICK_RATE_MS );
 	}
 		
 	//=========================================================================
+	StopTimer6();
+	
+	free((void*)frame[0]);
+	free((void*)frame[1]);
+	free(SizeOfFrame);
+	free(PointerToFrame);
+	frp=0;
+	i=0;
 	printf("f_close:\n");
 	fresult = f_close(&file);
 	FR_print_error(fresult);
-	
+}
+
+void vReadSD(void *pvParameters)
+{
+//	TCHAR		filepath[] = {"0:Horse2.bin"};
+	vTaskDelay( 100 / portTICK_RATE_MS );
+ 	 
+	printf("f_mount:\n");
+ 	fresult = f_mount(0, &fs);
+	FR_print_error(fresult);
+
+	for(;;)
+	{
+		SetFileToOut( "0:Horse2.bin" );
+		SetFileToOut( "0:test2.bin" );
+	}
 }
 
 void vSendUart(void *pvParameters)
@@ -917,7 +965,7 @@ void vOutToLaser(void *pvParameters)
 {
 	RNG_Config();
 	initialization_set_xy();
-	LaserOff();
+	LaserOff();//LaserOn();
 
 	STM_EVAL_PBInit(BUTTON_USER,BUTTON_MODE_GPIO);
 	

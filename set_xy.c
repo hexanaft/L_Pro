@@ -2,13 +2,13 @@
 
 void LaserOn( void )
 {
-	delayLas(1000);
+	delayLas(25000);
 	GPIO_SetBits(TTL_GPIO, TTL);
 }
 
 void LaserOff( void )
 {
-	delayLas(1000);
+	delayLas(25000);
 	GPIO_ResetBits(TTL_GPIO, TTL);
 }
 
