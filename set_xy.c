@@ -2,11 +2,13 @@
 
 void LaserOn( void )
 {
+	delayLas(1000);
 	GPIO_SetBits(TTL_GPIO, TTL);
 }
 
 void LaserOff( void )
 {
+	delayLas(1000);
 	GPIO_ResetBits(TTL_GPIO, TTL);
 }
 
@@ -74,10 +76,10 @@ void setXY(uint16_t valueX, uint16_t valueY)
 		count++;
 		
 		GPIO_SetBits(DAC_GPIO, DAC_SCLK);
-		delayXY(0x7f);
+		//delayXY(0x0f);
 	
 		GPIO_ResetBits(DAC_GPIO, DAC_SCLK);
-		delayXY(0x7f);
+		//delayXY(0x0f);
 	}
 	GPIO_SetBits(DAC_GPIO, DAC_SYNC);
 

@@ -39,7 +39,7 @@
   * PC.08    |      SDIO D0                |   D0          |    8        |	|-Pin 8			|
   * PC.09    |      SDIO D1                |   D1          |    9        |	|-Pin 9			|
   *          +-----------------------------+---------------+-------------+	+---------------+
-  * PC.07	 to GND ( Card Detect )
+  * PC.02	 to GND ( Card Detect )
 ****/
 
 uint8_t	*Frame = 0;
@@ -263,8 +263,8 @@ void init_timer6()
 	*/
 	TIM_TimeBaseStructInit(&base_timer);
 	/* Делитель учитывается как TIM_Prescaler + 1, поэтому отнимаем 1 */
-	base_timer.TIM_Prescaler = 84; //- 1; зачем -1 ???  							// 84000000 /840 = 100000
-	base_timer.TIM_Period = 5000;	// 1 секунда при 8400 делителе и 10000 таймере. // 100000 /200 = 500 раз в сек будет прерывание
+	base_timer.TIM_Prescaler = 42; //- 1; зачем -1 ???  							// 84000000 /840 = 100000
+	base_timer.TIM_Period = 1500;	// 1 секунда при 8400 делителе и 10000 таймере. // 100000 /200 = 500 раз в сек будет прерывание
 	TIM_TimeBaseInit(TIM6, &base_timer);
 
 	/* Разрешаем прерывание по обновлению (в данном случае -
@@ -296,11 +296,12 @@ void SetPointRandom( void )
 
 void SetPointFromFrame( void )
 {
-	static uint32_t Pointer = 0;
+	static uint32_t Pointer = 4;
 	static uint16_t CurrentFigure = 0;
 	static uint16_t CurrentPoint = 0;
 	static uint16_t NumOfFigures = 0;
 	static uint16_t NumOfPoints = 0;
+	//uint32_t framerep = 0;
 	
 	static uint8_t lfrp = 0;
 	
@@ -310,50 +311,60 @@ void SetPointFromFrame( void )
 	
 	if(lfrp != frp)
 	{
-		lfrp = frp;
-		Pointer = 0;
+		lfrp = frp;				//gde ispol'zuetsya?
+		Pointer = 4;
 		CurrentFigure = 0;
 		CurrentPoint = 0;
 		NumOfFigures = 0;
 		NumOfPoints = 0;
-		PrintFromMemFrameILDA(Frame, SizeOfFrame[nSizeOfFrame]);
+		//PrintFromMemFrameILDA(Frame, SizeOfFrame[nSizeOfFrame]);
 	}
 	
 	if( Pointer >= SizeOfFrame[nSizeOfFrame] )Pointer = 4;
-	NumOfFigures = toshort( &Frame[2] );
-
-	if( CurrentFigure < NumOfFigures )
+	if (CurrentFigure == 0)
 	{
-		if( CurrentPoint < NumOfPoints )
+		NumOfFigures = toshort( &Frame[2] );
+		//Pointer += 2;
+		NumOfPoints = toshort( &Frame[4] );
+	}
+		//!!!//
+	if( CurrentFigure != NumOfFigures )
+	{
+		if( CurrentPoint != NumOfPoints )
 		{
+			//LaserOn();
 			Pointer += 2;
 			valueX = toshort( &Frame[Pointer] );
 			Pointer += 2;
 			valueY = toshort( &Frame[Pointer] );
-			setXY(valueX, valueY);
-			printf("P:%04u X:%04X-Y:%04X\n",Pointer,valueX,valueY );
+			setXY(~valueX, valueY);
+			if (CurrentPoint == 0) LaserOn();
+			//printf("P:%04u X:%04X-Y:%04X\n",Pointer,valueX,valueY );
 			//printf("%u-%u\n",valueX,valueY );
-			//if( CurrentPoint == 0 )LaserOn();
 			
 			CurrentPoint++;
+			//LaserOff();
+
 		}
-		else 
+		else if ( CurrentPoint == NumOfPoints )
 		{
-			Pointer += 2;
-			NumOfPoints = toshort( &Frame[Pointer] );
-			
-			if( CurrentPoint == NumOfPoints )
-			{
+			//Pointer += 2;
+			//NumOfPoints = toshort( &Frame[Pointer] );
+			//
+			//if( CurrentPoint == NumOfPoints )
+			//{
 				CurrentPoint = 0;
+				//NumOfPoints = 0;
 				CurrentFigure++;
-				//LaserOff();
-			}
+				Pointer += 2;
+				NumOfPoints = toshort( &Frame[Pointer] );
+				LaserOff();
+			//}
 		}
-	}
-	else 
-	{
 		if( CurrentFigure == NumOfFigures ) CurrentFigure = 0;
-	};
+	}
+	//CurrentFigure = 0;
+	//else if( CurrentFigure == NumOfFigures ) CurrentFigure = 0;
 }
 
 void TIM6_DAC_IRQHandler()
@@ -370,7 +381,8 @@ void TIM6_DAC_IRQHandler()
 		{
 			/* Инвертируем состояние светодиодов */
 			STM_EVAL_LEDToggle(LED_ORANGE);
-			SetPointRandom();
+			//SetPointRandom();
+			
 		}
 		else
 		{
@@ -698,8 +710,8 @@ void ReadAllSizeFrame( FIL *fp, uint32_t NumOfFrames, uint32_t * AdrOfFrame, uin
 	{
 		f_lseek(fp,(int)AdrOfFrame[i-1]);
 		f_read(fp,(void*)&SizeOfFrame_tmp,sizeof(SizeOfFrame_tmp),0);
-		SizeOfFrame[i-1] = (uint32_t)SizeOfFrame_tmp;
-		AdrOfFrame[i] = AdrOfFrame[i-1] + SizeOfFrame_tmp + sizeof(SizeOfFrame_tmp);
+		SizeOfFrame[i-1] = (uint32_t)SizeOfFrame_tmp + 2; //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		AdrOfFrame[i] = AdrOfFrame[i-1] + SizeOfFrame[i-1];
 		printf("AdrNumOfFrame %u:%u byte\n",i,AdrOfFrame[i]);
 		printf("SizeOfFrame %u:%u byte\n",i-1,SizeOfFrame[i-1]);
 	}
@@ -722,7 +734,7 @@ void vReadSD(void *pvParameters)
 	FATFS   	fs;
 	FIL     	file;
 	FRESULT		fresult;
-	TCHAR		filepath[] = {"0:sun.bin"};
+	TCHAR		filepath[] = {"0:test2.bin"};
 
 	uint32_t	*PointerToFrame;
 	//uint32_t	*SizeOfFrame;
@@ -905,7 +917,7 @@ void vOutToLaser(void *pvParameters)
 {
 	RNG_Config();
 	initialization_set_xy();
-	LaserOn();
+	LaserOff();
 
 	STM_EVAL_PBInit(BUTTON_USER,BUTTON_MODE_GPIO);
 	
