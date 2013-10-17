@@ -3,6 +3,8 @@
 #ifndef __SET_XY_H
 #define __SET_XY_H
 
+#define LaserStatus
+
 #include "stm32f4xx.h"
 #include <stdio.h>
 
@@ -22,8 +24,9 @@ void delayLas(uint32_t counter3);
 void delayXY(uint32_t counter2);
 void setXY(uint16_t valueX, uint16_t valueY);
 
-void LaserOn( void );
-void LaserOff( void );
+void LaserOn( uint32_t	DelayLazerOn );
+void LaserOff( uint32_t	DelayLazerOff );
+void LaserInvert( void );
 
 #endif /* __SET_XY_H */
 //******************************************************************************

@@ -1,16 +1,34 @@
 #include "set_xy.h"
+#include "LaserTimer.h"
+#include "discoveryf4utils.h"
+//#include "main.c"
+uint8_t LaserOnGlobe = 0;
+uint8_t LaserOffGlobe = 0;
 
-void LaserOn( void )
+//extern volatile uint8_t LaserStatusGlobe;
+
+void LaserInvert( void )
 {
-	delayLas(25000);
-	GPIO_SetBits(TTL_GPIO, TTL);
+	GPIO_ToggleBits(TTL_GPIO, TTL);
 }
 
-void LaserOff( void )
+void LaserOn( uint32_t	DelayLazerOn )
 {
-	delayLas(25000);
-	GPIO_ResetBits(TTL_GPIO, TTL);
+	LaserOnGlobe = 1;
+	init_timer7((uint16_t)	DelayLazerOn );
+	//STM_EVAL_LEDToggle(LED_RED);
+	//printf("On_LaserStatusGlobe:        %u\n",LaserStatusGlobe);
 }
+
+void LaserOff( uint32_t	DelayLazerOff )
+{
+	//DelayLazerOff = DelayLazerOff << 16;
+	LaserOffGlobe = 1;
+	init_timer5((uint16_t)	DelayLazerOff );
+//	STM_EVAL_LEDToggle(LED_GREEN);
+	//printf("Off_LaserStatusGlobe:        %u\n",LaserStatusGlobe);
+}
+
 
 void initialization_set_xy( void )
 {
@@ -23,22 +41,24 @@ void initialization_set_xy( void )
 	port.GPIO_OType = GPIO_OType_PP;
 	port.GPIO_PuPd = GPIO_PuPd_NOPULL;
 	GPIO_Init(DAC_GPIO, &port);
+	
+	GPIO_ResetBits(TTL_GPIO, TTL);
 }
 
-void delayLas(uint32_t counter3)
-{
-	while (counter3--)
-	{
-		counter3++;
-		counter3--;
-		counter3++;
-		counter3--;
-		counter3++;
-		counter3--;
-		counter3++;
-		counter3--;
-	}
-}
+// void delayLas(uint32_t counter3)
+// {
+// 	while (counter3--)
+// 	{
+// 		counter3++;
+// 		counter3--;
+// 		counter3++;
+// 		counter3--;
+// 		counter3++;
+// 		counter3--;
+// 		counter3++;
+// 		counter3--;
+// 	}
+// }
 
 void delayXY(uint32_t counter2)
 {
