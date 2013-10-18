@@ -47,6 +47,8 @@ STM32 SDIO Pin assignment
 	  PD.08 UART TX
 ******************************************************************************/
 
+#define	SIZE_OF_FRAME_MAX		0x1fff
+
 //*****************************************************************************
 // Global variables
 FATFS   	fs;
@@ -102,7 +104,7 @@ int main(void)
 	xTaskCreate( vSendUart, (const signed char*)"vSendUart", 
 		STACK_SIZE_MIN, NULL, tskIDLE_PRIORITY, NULL );	
  	xTaskCreate( vReadSD, (const signed char*)"vReadSD", 
- 		STACK_SIZE_MIN*10, NULL, 2 | portPRIVILEGE_BIT, NULL );
+ 		STACK_SIZE_MIN*10, NULL, 1 | portPRIVILEGE_BIT, NULL );
 	xTaskCreate( vOutToLaser, (const signed char*)"vOutToLaser", 
 		STACK_SIZE_MIN*10, NULL, tskIDLE_PRIORITY, NULL );
 		
@@ -111,6 +113,8 @@ int main(void)
 }
 //******************************************************************************
 
+//pvPortMalloc()
+//vPortFree()
 
 //******************************************************************************
 // void WaitUntilFrameIsFirstShown( void )
@@ -219,14 +223,14 @@ void SetPointFromFrame( void )
 			valueY = toshort( &Frame[Pointer] );
 			setXY(~valueX, valueY);
 //			printf("P:%04u X:%04X-Y:%04X\n",Pointer,valueX,valueY );
-			//printf("Точек всего:%u-Точка:%u-Фигур всего:%u-Фигура:%u\n",NumOfPoints,CurrentPoint,NumOfFigures,CurrentFigure );
+//			printf("Точек всего:%u-Точка:%u-Фигур всего:%u-Фигура:%u\n",NumOfPoints,CurrentPoint,NumOfFigures,CurrentFigure );
 			//printf("%u-%u\n",valueX,valueY );
 			if (CurrentPoint == 0) LaserOn( Head_ilda.DelayLazerOn );
 			CurrentPoint++;
 		}
 		if ( CurrentPoint == NumOfPoints )
 		{
-//			printf("NumOfFigures:%u-NumOfPoints:%u\n",NumOfFigures,NumOfPoints);
+//			printf("NumOfFigures====:%u-NumOfPoints:%u\n",NumOfFigures,NumOfPoints);
 //			printf("FrameIsReady:%u \n",FrameIsReady);
 			//printf("nSizeOfFrame:%u\n",nSizeOfFrame);
 			CurrentPoint = 0;
@@ -235,7 +239,7 @@ void SetPointFromFrame( void )
 			{
 				Pointer += 2;
 				NumOfPoints = toshort( &Frame[Pointer] );
-//				printf("Фигур всего:%u-Фигура:%u\n",NumOfFigures,CurrentFigure );
+//				printf("Фигур всего!===:%u-Фигура:%u\n",NumOfFigures,CurrentFigure );
 				//printf("NumOfPoints:%u\n",NumOfPoints);
 				//LaserOff( Head_ilda.DelayLazerOff );
 			}
@@ -265,6 +269,8 @@ void SetFileToOut( const TCHAR * filepath )
 	uint32_t	* PointerToFrame;
 	uint16_t	nFrp = 0;
 	uint8_t		counter = 0;
+	
+	uint8_t		FrameLokal[SIZE_OF_FRAME_MAX];
 
 	//+++++++++++++++++++++++++++++++++++
 	printf("Открываем файл: %s\n",filepath);
@@ -276,25 +282,25 @@ void SetFileToOut( const TCHAR * filepath )
 	
 	///////////////////////////////////////////////////////////////////////////
 	//=========================================================================
-	PointerToFrame = (uint32_t*)malloc(Head_ilda.NumOfFrames * sizeof(uint32_t));
+	PointerToFrame = (uint32_t*)pvPortMalloc(Head_ilda.NumOfFrames * sizeof(uint32_t));
 	if (PointerToFrame == NULL) 
 	{
-		printf("malloc PointerToFrame:%u byte\n",Head_ilda.NumOfFrames);
-		printf("malloc dermo!\n");
+		printf("pvPortMalloc PointerToFrame:%u byte\n",Head_ilda.NumOfFrames);
+		printf("pvPortMalloc dermo!\n");
 		return;
 	}
-	//else printf("malloc OK!\n");
+	//else printf("pvPortMalloc OK!\n");
 	//=========================================================================
 	
 	//=========================================================================
-	SizeOfFrame = (uint32_t*)malloc(Head_ilda.NumOfFrames * sizeof(uint32_t));
+	SizeOfFrame = (uint32_t*)pvPortMalloc(Head_ilda.NumOfFrames * sizeof(uint32_t));
 	if (SizeOfFrame == NULL) 
 	{
-		printf("malloc SizeOfFrame:%u byte\n",Head_ilda.NumOfFrames);
-		printf("malloc dermo!\n");
+		printf("pvPortMalloc SizeOfFrame:%u byte\n",Head_ilda.NumOfFrames);
+		printf("pvPortMalloc dermo!\n");
 		return;
 	}
-	//else printf("malloc OK!\n");
+	//else printf("pvPortMalloc OK!\n");
 	//=========================================================================
 	
 	// Считываем размеры и адреса всех фреймов
@@ -316,24 +322,13 @@ void SetFileToOut( const TCHAR * filepath )
 	FrameIsReady = 1;
 	//printf("Пошли в вайл\n");
 	
-	for(nFrp=0;nFrp<Head_ilda.NumOfFrames;nFrp++)
+	for(nFrp=0;nFrp<=(Head_ilda.NumOfFrames);nFrp++)
 	{
-		if(frame[0] != NULL)free((void*)frame[frp]);
-		//=========================================================================
-		frame[0] = (uint8_t*)malloc(SizeOfFrame[nFrp] * sizeof(uint8_t));
-		if (frame[0] == NULL)
-		{
-			printf("SizeOfFrame:%u byte\n",SizeOfFrame[nFrp]);
-			printf("malloc dermo!\n");
-			return;
-		}
-		//else printf("malloc OK!\n");
-		printf("Выделили память nFrp = %u, adr = %X\n",nFrp,(void*)frame[0]);
-		printf("	AdrNumOfFrame %u:%u byte\n",nFrp,PointerToFrame[nFrp]);
+		printf("	AdrNumOfFrame %u:%X byte\n",nFrp,PointerToFrame[nFrp]);
 		printf("	SizeOfFrame %u:%u byte\n",nFrp,SizeOfFrame[nFrp]);
 		//=========================================================================
-		ReadToMemFrameILDA(&file,frame[0],PointerToFrame[nFrp],SizeOfFrame[nFrp]);
-		PrintFromMemFrameILDA(frame[0],SizeOfFrame[nFrp]);
+		ReadToMemFrameILDA(&file,FrameLokal,PointerToFrame[nFrp],SizeOfFrame[nFrp]);
+		PrintFromMemFrameILDA(FrameLokal,SizeOfFrame[nFrp]);
 	}
 	
 	while( counter < 500)
@@ -346,19 +341,19 @@ void SetFileToOut( const TCHAR * filepath )
 			printf("Фрейм:%3u, frp = %3u SizeOfFrame:%u byte\n",nFrp,frp,SizeOfFrame[nFrp]);
 			
 			printf("Очищаем память frp =%i, adr = %X\n",frp,(void*)frame[frp]);
-			free((void*)frame[frp]); //if(frame[frp] != NULL)
+			vPortFree((void*)frame[frp]); //if(frame[frp] != NULL)
 			//=========================================================================
-			frame[frp] = (uint8_t*)malloc(SizeOfFrame[nFrp] * sizeof(uint8_t));
+			frame[frp] = (uint8_t*)pvPortMalloc(SizeOfFrame[nFrp] * sizeof(uint8_t));
 			
 			//PrintFromMemFrameILDA(frame[frp],SizeOfFrame[nFrp]);
 			
 			if (frame[frp] == NULL)
 			{
 				printf("SizeOfFrame:%u byte\n",SizeOfFrame[nFrp]);
-				printf("malloc dermo!\n");
+				printf("pvPortMalloc dermo!\n");
 				return;
 			}
-			//else printf("malloc OK!\n");
+			//else printf("pvPortMalloc OK!\n");
 			printf("Выделили память frp =%i, adr = %X\n",frp,(void*)frame[frp]);
 			//=========================================================================
 			ReadToMemFrameILDA(&file,frame[frp],PointerToFrame[nFrp],SizeOfFrame[nFrp]);
@@ -387,10 +382,10 @@ void SetFileToOut( const TCHAR * filepath )
 	//=========================================================================
 	StopTimer6();
 	
-	free((void*)frame[0]);
-	free((void*)frame[1]);
-	free(SizeOfFrame);
-	free(PointerToFrame);
+	vPortFree((void*)frame[0]);
+	vPortFree((void*)frame[1]);
+	vPortFree(SizeOfFrame);
+	vPortFree(PointerToFrame);
 	
 	*SizeOfFrame = NULL;
 	*PointerToFrame = NULL;
